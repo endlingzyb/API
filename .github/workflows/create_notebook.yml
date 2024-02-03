@@ -27,6 +27,6 @@ jobs:
         env:
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-          USER_ID: ${{ secrets.USER_ID }}
+          TENANT_ID: ${{ secrets.TENANT_ID }}
         run: |
           python your_script_to_create_notebook.py
