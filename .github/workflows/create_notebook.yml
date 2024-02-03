@@ -29,4 +29,4 @@ jobs:
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
           TENANT_ID: ${{ secrets.TENANT_ID }}
         run: |
-          python your_script_to_create_notebook.py
+          python create_notebook.py
