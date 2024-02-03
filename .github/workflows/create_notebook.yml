@@ -20,7 +20,7 @@ jobs:
 
       - name: Install msgraph library
         run: |
-          pip install msgraph
+          pip install msgraph-sdk
 
       - name: Create OneNote Notebook
         env:
