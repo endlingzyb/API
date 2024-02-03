@@ -1,6 +1,4 @@
 import os
-from msgraph import auth, client
-
 from azure.identity.aio import ClientSecretCredential
 
 credential = ClientSecretCredential(
