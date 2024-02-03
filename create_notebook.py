@@ -1,5 +1,5 @@
 import os
-from msgraph import auth, client
+from msgraph-sdk import auth, client
 
 client_id = os.environ.get('CLIENT_ID')
 client_secret = os.environ.get('CLIENT_SECRET')
