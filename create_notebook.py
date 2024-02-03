@@ -1,17 +1,16 @@
 import os
 from msgraph import auth, client
 
-client_id = os.environ.get('CLIENT_ID')
-client_secret = os.environ.get('CLIENT_SECRET')
-user_id = os.environ.get('TENANT_ID')
+from azure.identity.aio import ClientSecretCredential
 
-credentials = auth.ClientCredentialProvider(
-    client_id=client_id,
-    client_secret=client_secret
+credential = ClientSecretCredential(
+    tenant_id=os.environ.get('TENANT_ID'),
+    client_id=os.environ.get('CLIENT_ID'),
+    client_secret=os.environ.get('CLIENT_SECRET'),
 )
 
 graph_client = client.GraphClient(
-    credentials, 
+    credential, 
     scopes=['Notes.ReadWrite.All']
 )
 
