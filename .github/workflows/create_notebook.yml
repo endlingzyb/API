@@ -1,28 +1,32 @@
+
 name: Create OneNote Notebook
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  build:
+  create_notebook:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.8
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.8
+          python-version: '3.8'
 
-      - name: Install dependencies
-        run: pip install requests msgraph-sdk
+      - name: Install msgraph library
+        run: |
+          python -m pip install --upgrade pip
+          pip install msgraph
 
-      - name: Run Python script
+      - name: Create OneNote Notebook
         env:
-          TENANT_ID: ${{ secrets.TENANT_ID }}
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-        run: python create_notebook.py
+          USER_ID: ${{ secrets.USER_ID }}
+        run: |
+          python your_script_to_create_notebook.py
