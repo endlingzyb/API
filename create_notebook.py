@@ -22,7 +22,7 @@ def create_notebook(access_token):
         "Content-Type": "application/json"
     }
     payload = {
-        "displayName": "Your Notebook Name"
+        "displayName": "new"
     }
     response = requests.post(endpoint, headers=headers, json=payload)
     return response.json()
