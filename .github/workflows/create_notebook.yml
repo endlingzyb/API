@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  watch:
+    types: started
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: 0 16 * * *
 
 jobs:
   create_notebook:
