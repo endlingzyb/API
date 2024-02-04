@@ -30,7 +30,7 @@ result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.defa
 access_token = result['access_token']
 
 # 使用访问令牌调用 Microsoft Graph API 创建 OneNote 笔记本
-url = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site/onenote/notebooks/1-045056de-adc7-4de0-9cb6-86ea0fed4d74/pages"
+url = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site/notes/pages"
 url_me = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site"
 
 headers = {
