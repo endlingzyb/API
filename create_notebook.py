@@ -18,11 +18,16 @@ access_token = result['access_token']
 
 # 使用访问令牌调用 Microsoft Graph API 创建 OneNote 笔记本
 url = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site/onenote/notebooks"
+url_me = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site"
 
 headers = {
     'Authorization': 'Bearer ' + access_token,
     'Content-Type': 'application/json'
 }
+
+response = requests.get(url, headers=headers)
+print(response.json())
+
 data = {
     'displayName': 'add'
 }
