@@ -14,6 +14,7 @@ def generate_random_str(randomlength=16):
   length =len(base_str) -1
   for i in range(randomlength):
     random_str +=base_str[random.randint(0, length)]
+  return random_str
 
 
 # 通过环境变量获取 Microsoft Graph API 的凭证信息
