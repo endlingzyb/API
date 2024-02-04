@@ -30,7 +30,7 @@ result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.defa
 access_token = result['access_token']
 
 # 使用访问令牌调用 Microsoft Graph API 创建 OneNote 笔记本
-url = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site/notes/1-045056de-adc7-4de0-9cb6-86ea0fed4d74/pages"
+url = "https://graph.microsoft.com/v1.0/users/546342df-31bf-447f-8771-ccd71708539f/onenote/sections/1-045056de-adc7-4de0-9cb6-86ea0fed4d74/pages"
 url_me = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site"
 
 headers = {
@@ -44,7 +44,7 @@ print(response.json())
 data = {
         "content":  "<!DOCTYPE html><html><head><title>" + generate_random_str(10) + "</title></head><body><p>" + generate_random_str(10) + "<i>formatted</i> <b>text</b>.</p></body></html>"
 }
-response = requests.post(url, headers=headers, data=json.dumps(data))
+response = requests.post(url, headers=headers, data=data)
 
 # 打印创建笔记本的返回结果
 print(response.json())
