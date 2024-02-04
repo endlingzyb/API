@@ -4,15 +4,16 @@ import requests
 import json
 import os
 
-import random
- 
-# 生成随机字符的函数
-def generate_random_char():
-    # 所有可能字符
-    chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    # 随机选择一个字符
-    char = random.choice(chars)
-    return char
+
+def generate_random_str(randomlength=16):
+  """
+  生成一个指定长度的随机字符串
+  """
+  random_str =''
+  base_str ='ABCDEFGHIGKLMNOPQRSTUVWXYZabcdefghigklmnopqrstuvwxyz0123456789'
+  length =len(base_str) -1
+  for i in range(randomlength):
+    random_str +=base_str[random.randint(0, length)]
 
 
 # 通过环境变量获取 Microsoft Graph API 的凭证信息
@@ -28,7 +29,7 @@ result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.defa
 access_token = result['access_token']
 
 # 使用访问令牌调用 Microsoft Graph API 创建 OneNote 笔记本
-url = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site/onenote/notebooks"
+url = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site/onenote/sections/1-045056de-adc7-4de0-9cb6-86ea0fed4d74/pages"
 url_me = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site"
 
 headers = {
@@ -40,7 +41,15 @@ response = requests.get(url, headers=headers)
 print(response.json())
 
 data = {
-    'displayName': generate_random_char()
+        '''<!DOCTYPE html>
+<html>
+  <head>
+    <title>''' + generate_random_str(10) + '''</title>
+  </head>
+  <body>
+    <p>''' + generate_random_str(30) + '''<i>formatted</i> <b>text</b>.</p>
+  </body>
+</html>'''
 }
 response = requests.post(url, headers=headers, data=json.dumps(data))
 
