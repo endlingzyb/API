@@ -1,4 +1,3 @@
-
 name: Create OneNote Notebook
 
 on:
@@ -18,14 +17,13 @@ jobs:
         with:
           python-version: '3.8'
 
-      - name: Install msgraph library
-        run: |
-          pip install msgraph-sdk
+      - name: Install dependencies
+        run: pip install requests msal requests_oauthlib
 
-      - name: Create OneNote Notebook
-        env:
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-          TENANT_ID: ${{ secrets.TENANT_ID }}
+      - name: Run Python script to create OneNote notebook
         run: |
           python create_notebook.py
+        env:
+          CLIENT_ID: ${{secrets.CLIENT_ID}}
+          CLIENT_SECRET: ${{secrets.CLIENT_SECRET}}
+          TENANT_ID: ${{secrets.TENANT_ID}}
