@@ -42,7 +42,8 @@ response = requests.get(url_me, headers=headers)
 print(response.json())
 
 data = {
-        "content":  "<!DOCTYPE html><html><head><title>" + generate_random_str(10) + "</title></head><body><p>" + generate_random_str(10) + "<i>formatted</i> <b>text</b>.</p></body></html>"
+        "displayName": generate_random_str(10),
+        "content":  "<p>" + generate_random_str(10) + "</p>"
 }
 response = requests.post(url, headers=headers, data=json.dumps(data))
 
