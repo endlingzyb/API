@@ -17,7 +17,7 @@ result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.defa
 access_token = result['access_token']
 
 # 使用访问令牌调用 Microsoft Graph API 创建 OneNote 笔记本
-url = "https://graph.microsoft.com/v1.0/user/renew@zhouyb.site/notes/notebooks"
+url = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site/notes/notebooks"
 headers = {
     'Authorization': 'Bearer ' + access_token,
     'Content-Type': 'application/json'
