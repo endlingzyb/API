@@ -4,6 +4,17 @@ import requests
 import json
 import os
 
+import random
+ 
+# 生成随机字符的函数
+def generate_random_char():
+    # 所有可能字符
+    chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    # 随机选择一个字符
+    char = random.choice(chars)
+    return char
+
+
 # 通过环境变量获取 Microsoft Graph API 的凭证信息
 client_id = os.environ.get('CLIENT_ID')
 client_secret = os.environ.get('CLIENT_SECRET')
@@ -29,7 +40,7 @@ response = requests.get(url, headers=headers)
 print(response.json())
 
 data = {
-    'displayName': 'add'
+    'displayName': generate_random_char()
 }
 response = requests.post(url, headers=headers, data=json.dumps(data))
 
