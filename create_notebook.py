@@ -44,7 +44,7 @@ print(response.json())
 data = {
         "content":  "<!DOCTYPE html><html><head><title>" + generate_random_str(10) + "</title></head><body><p>" + generate_random_str(10) + "<i>formatted</i> <b>text</b>.</p></body></html>"
 }
-response = requests.post(url, headers=headers, data=data)
+response = requests.post(url, headers=headers, data=json.dump(data))
 
 # 打印创建笔记本的返回结果
 print(response.json())
