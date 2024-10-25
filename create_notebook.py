@@ -16,6 +16,18 @@ def generate_random_str(randomlength=16):
     random_str +=base_str[random.randint(0, length)]
   return random_str
 
+page_content = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>新页面</title>
+</head>
+<body>
+    <h1>这是一个新页面</h1>
+    <p>欢迎使用 OneNote API!</p>
+</body>
+</html>
+"""
 
 # 通过环境变量获取 Microsoft Graph API 的凭证信息
 client_id = os.environ.get('CLIENT_ID')
@@ -36,7 +48,7 @@ url_me = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site"
 
 headers = {
     'Authorization': 'Bearer ' + access_token,
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/xhtml+xml'
 }
 
 response = requests.get(url_me, headers=headers)
@@ -54,7 +66,7 @@ print(response.json())
 data = {
         "displayName": generate_random_str(10)"
 }
-response = requests.post(url, headers=headers, data=json.dumps(data))
+response = requests.post(url, headers=headers, data=page_content)
 
 # 打印创建笔记本的返回结果
 print(response.json())
