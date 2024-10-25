@@ -20,10 +20,10 @@ page_content = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>新页面</title>
+    <title>""" + generate_random_str(6) + """</title>
 </head>
 <body>
-    <h1>这是一个新页面</h1>
+    <h1>""" + generate_random_str(16) + """</h1>
     <p>欢迎使用 OneNote API!</p>
 </body>
 </html>
