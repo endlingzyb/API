@@ -52,8 +52,7 @@ response = requests.get(url_me+"/onenote/pages", headers=headers)
 print(response.json())
 
 data = {
-        "displayName": generate_random_str(10),
-        "content":  "<p>" + generate_random_str(10) + "</p>"
+        "displayName": generate_random_str(10)"
 }
 response = requests.post(url, headers=headers, data=json.dumps(data))
 
