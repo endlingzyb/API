@@ -51,11 +51,11 @@ print(response.json())
 response = requests.get(url_me+"/onenote/pages", headers=headers)
 print(response.json())
 
-#data = {
-#        "displayName": generate_random_str(10),
-#        "content":  "<p>" + generate_random_str(10) + "</p>"
-#}
-#response = requests.post(url, headers=headers, data=json.dumps(data))
+data = {
+        "displayName": generate_random_str(10),
+        "content":  "<p>" + generate_random_str(10) + "</p>"
+}
+response = requests.post(url, headers=headers, data=json.dumps(data))
 
 # 打印创建笔记本的返回结果
-#print(response.json())
+print(response.json())
