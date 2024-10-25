@@ -31,7 +31,7 @@ access_token = result['access_token']
 
 # 使用访问令牌调用 Microsoft Graph API 创建 OneNote 笔记本
 
-url = "https://graph.microsoft.com/v1.0/users/546342df-31bf-447f-8771-ccd71708539f/onenote/notebooks/1-9ac1037f-013b-4e19-b14a-fa61da5d98f2/sections/1-fb339352-9c74-4f0b-b885-d4ddf8dd9178/pages"
+url = "https://graph.microsoft.com/v1.0/users/546342df-31bf-447f-8771-ccd71708539f/onenote/sections/1-fb339352-9c74-4f0b-b885-d4ddf8dd9178/pages"
 url_me = "https://graph.microsoft.com/v1.0/users/renew@zhouyb.site"
 
 headers = {
