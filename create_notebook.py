@@ -5,30 +5,64 @@ import json
 import os
 import random
 
-def generate_random_str(length=16):
-  """
-  生成一个指定长度的随机中文字符串
-  """
-  # random_str =''
-  # base_str ='ABCDEFGHIGKLMNOPQRSTUVWXYZabcdefghigklmnopqrstuvwxyz0123456789'
-  # length =len(base_str) -1
-  # for i in range(randomlength):
-  #   random_str +=base_str[random.randint(0, length)]
-  # return random_str
+# 进一步扩展后的词库
+titles = [
+    "春日吟", "月下独行", "秋风送爽", "夏夜星空", 
+    "冬雪寒梅", "晨曦初露", "夜雨潇潇", "孤舟远影",
+    "山间清泉", "梦回故乡", "花间一壶酒", "月影摇曳",
+    "云海苍茫", "湖边小憩", "风吹柳絮", "星辰大海"
+]
 
-  chinese_chars = ''.join(chr(i) for i in range(0x4e00, 0x9fa5))
-  
-  return ''.join(random.choice(chinese_chars) for _ in range(length))
+nouns = [
+    "花", "月", "风", "云", "星", 
+    "山", "水", "雪", "鸟", "树",
+    "海", "草", "路", "影", "梦",
+    "琴", "酒", "灯", "影", "雨",
+    "心", "情", "夜", "光", "沙",
+    "露", "雾", "声", "歌", "舞"
+]
+
+verbs = [
+    "吟", "舞", "飞", "落", "照", 
+    "笑", "泪", "思", "望", "听",
+    "追", "唱", "奔", "游", "藏",
+    "漂", "摇", "飘", "闪", "舞",
+    "吟唱", "徘徊", "漫步", "回忆", "倾诉",
+    "凝视", "感受", "探索"
+]
+
+adjectives = [
+    "静", "远", "清", "明", "孤", 
+    "寒", "热", "柔", "烈", "暗",
+    "幽", "淡", "甜", "苦", "浓",
+    "苍", "绿", "红", "蓝", "古",
+    "美丽的", "孤独的", "温暖的", 
+    "神秘的","宁静的","灿烂的",
+    "悠扬的","璀璨的","恬淡的"
+]
+
+# 生成标题的函数
+def generate_title():
+    return random.choice(titles) + ' ' + random.choice(nouns)
+
+# 生成诗句的函数
+def generate_verse():
+    noun = random.choice(nouns)
+    verb = random.choice(verbs)
+    adjective = random.choice(adjectives)
+    
+    verse = f"{adjective}的{noun}在{verb}中"
+    
+    return verse
 
 page_content = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>""" + generate_random_str(6) + """</title>
+    <title>""" + generate_title() + """</title>
 </head>
 <body>
-    <h1>""" + generate_random_str(16) + """</h1>
-    <p>欢迎使用 OneNote API!</p>
+    <h1>""" + generate_verse() + """</h1>
 </body>
 </html>
 """
