@@ -5,16 +5,20 @@ import json
 import os
 import random
 
-def generate_random_str(randomlength=16):
+def generate_random_str(length=16):
   """
-  生成一个指定长度的随机字符串
+  生成一个指定长度的随机中文字符串
   """
-  random_str =''
-  base_str ='ABCDEFGHIGKLMNOPQRSTUVWXYZabcdefghigklmnopqrstuvwxyz0123456789'
-  length =len(base_str) -1
-  for i in range(randomlength):
-    random_str +=base_str[random.randint(0, length)]
-  return random_str
+  # random_str =''
+  # base_str ='ABCDEFGHIGKLMNOPQRSTUVWXYZabcdefghigklmnopqrstuvwxyz0123456789'
+  # length =len(base_str) -1
+  # for i in range(randomlength):
+  #   random_str +=base_str[random.randint(0, length)]
+  # return random_str
+
+  chinese_chars = ''.join(chr(i) for i in range(0x4e00, 0x9fa5))
+  
+  return ''.join(random.choice(chinese_chars) for _ in range(length))
 
 page_content = """
 <!DOCTYPE html>
