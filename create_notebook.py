@@ -51,7 +51,11 @@ def generate_verse():
     verb = random.choice(verbs)
     adjective = random.choice(adjectives)
     
-    verse = f"{adjective}的{noun}在{verb}中"
+    verse = """
+    {noun}{verb}在{adjective}的{noun},
+    {noun}{verb}着{adjective}的{noun},
+    {adjective}的{noun}在{verb}中
+    """
     
     return verse
 
