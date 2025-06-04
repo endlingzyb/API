@@ -60,12 +60,14 @@ def generate_verse():
 
 # ========== 获取 access_token ==========
 client_id = os.environ["CLIENT_ID"]
+client_secret = os.environ["CLIENT_SECRET"]
 tenant_id = os.environ["TENANT_ID"]
 refresh_token = os.environ["GRAPH_REFRESH_TOKEN"]
 
 token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
 data = {
     "client_id": client_id,
+    "client_secret": client_secret,
     "grant_type": "refresh_token",
     "refresh_token": refresh_token,
     "scope": "https://graph.microsoft.com/.default offline_access"
