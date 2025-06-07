@@ -1,6 +1,7 @@
 import os
 import requests
 import random
+from datetime import datetime
 
 # ========== 诗句词库 ==========
 titles = [
@@ -84,6 +85,8 @@ access_token = resp.json()["access_token"]
 # ========== 构建页面内容 ==========
 title = generate_title()
 verse = generate_verse()
+# 获取当前本地时间（含年月日、时分秒）
+current_time = datetime.now()
 
 page_content = f"""<!DOCTYPE html>
 <html>
