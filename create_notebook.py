@@ -1,63 +1,7 @@
 import os
 import requests
-import random
-from datetime import datetime
-
-# ========== 诗句词库 ==========
-titles = [
-    "春日吟", "月下独行", "秋风送爽", "夏夜星空", 
-    "冬雪寒梅", "晨曦初露", "夜雨潇潇", "孤舟远影",
-    "山间清泉", "梦回故乡", "花间一壶酒", "月影摇曳",
-    "云海苍茫", "湖边小憩", "风吹柳絮", "星辰大海"
-]
-
-nouns = [
-    "花", "月", "风", "云", "星", 
-    "山", "水", "雪", "鸟", "树",
-    "海", "草", "路", "影", "梦",
-    "琴", "酒", "灯", "影", "雨",
-    "心", "情", "夜", "光", "沙",
-    "露", "雾", "声", "歌", "舞"
-]
-
-verbs = [
-    "吟", "舞", "飞", "落", "照", 
-    "笑", "泪", "思", "望", "听",
-    "追", "唱", "奔", "游", "藏",
-    "漂", "摇", "飘", "闪", "舞",
-    "吟唱", "徘徊", "漫步", "回忆", "倾诉",
-    "凝视", "感受", "探索"
-]
-
-adjectives = [
-    "静", "远", "清", "明", "孤", 
-    "寒", "热", "柔", "烈", "暗",
-    "幽", "淡", "甜", "苦", "浓",
-    "苍", "绿", "红", "蓝", "古",
-    "美丽的", "孤独的", "温暖的", 
-    "神秘的","宁静的","灿烂的",
-    "悠扬的","璀璨的","恬淡的"
-]
-
-def generate_title():
-    return random.choice(titles) + " " + random.choice(nouns)
-
-def generate_verse():
-    noun1 = random.choice(nouns)
-    verb1 = random.choice(verbs)
-    adj1 = random.choice(adjectives)
-    noun2 = random.choice(nouns)
-    verb2 = random.choice(verbs)
-    adj2 = random.choice(adjectives)
-    noun3 = random.choice(nouns)
-    verb3 = random.choice(verbs)
-    adj3 = random.choice(adjectives)
-
-    return f"""
-        {noun1}{verb1}在{adj1}的{noun2},<br/>
-        {noun2}{verb2}着{adj2}的{noun3},<br/>
-        {adj3}的{noun3}在{verb3}中
-    """
+from datetime import datetime, timezone
+import html
 
 # ========== 获取 access_token ==========
 client_id = os.environ["CLIENT_ID"]
@@ -82,22 +26,36 @@ if resp.status_code != 200:
 
 access_token = resp.json()["access_token"]
 
-# ========== 构建页面内容 ==========
-title = generate_title()
-verse = generate_verse()
-# 获取当前本地时间（含年月日、时分秒）
-current_time = datetime.now()
+# ========== 生成内容 ==========
+def generate_title():
+    return datetime.now().strftime("%Y-%m-%d")
 
+def generate_joke():
+    try:
+        headers = {"Accept": "application/json"}
+        resp = requests.get("https://icanhazdadjoke.com/", headers=headers)
+        if resp.status_code == 200:
+            return html.escape(resp.json()["joke"])
+        else:
+            return "加载笑话失败 🥲"
+    except Exception:
+        return "获取笑话异常 🥲"
+
+title = generate_title()
+joke = generate_joke()
+current_time = datetime.now(timezone.utc)
+
+# ========== 构建页面内容 ==========
 page_content = f"""<!DOCTYPE html>
-<html>
+<html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <title>{title}</title>
-    <meta name="created" content="{current_time.strftime("%Y-%m-%dT%H:%M:%SZ")}" />
+    <meta name="created" content="{current_time.strftime('%Y-%m-%dT%H:%M:%SZ')}" />
   </head>
   <body>
     <h1>{title}</h1>
-    <p>{current_time}</p>
-    <p>{verse}</p>
+    <p>{joke}</p>
+    <img src="https://cataas.com/cat" alt="猫咪" />
   </body>
 </html>"""
 
