@@ -96,6 +96,7 @@ page_content = f"""<!DOCTYPE html>
   </head>
   <body>
     <h1>{title}</h1>
+    <p>{current_time}</p>
     <p>{verse}</p>
   </body>
 </html>"""
