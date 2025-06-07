@@ -89,7 +89,7 @@ page_content = f"""<!DOCTYPE html>
 <html>
   <head>
     <title>{title}</title>
-    <meta name="created" content="2025-06-04T00:00:00Z" />
+    <meta name="created" content="{{ current_time }}" />
   </head>
   <body>
     <h1>{title}</h1>
