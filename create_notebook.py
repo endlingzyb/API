@@ -92,7 +92,7 @@ page_content = f"""<!DOCTYPE html>
 <html>
   <head>
     <title>{title}</title>
-    <meta name="created" content="{{ current_time }}" />
+    <meta name="created" content="{current_time.strftime("%Y-%m-%dT%H:%M:%SZ")}" />
   </head>
   <body>
     <h1>{title}</h1>
