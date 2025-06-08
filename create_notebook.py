@@ -1,6 +1,7 @@
 import os
 import requests
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 import html
 
 # ========== 获取 access_token ==========
@@ -43,7 +44,7 @@ def generate_joke():
 
 title = generate_title()
 joke = generate_joke()
-current_time = datetime.now(timezone.utc)
+current_time = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai"))
 
 # ========== 构建页面内容 ==========
 page_content = f"""<!DOCTYPE html>
