@@ -29,7 +29,7 @@ access_token = resp.json()["access_token"]
 
 # ========== 生成内容 ==========
 def generate_title():
-    return datetime.now().strftime("%Y-%m-%d")
+    return datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
 
 def generate_joke():
     try:
