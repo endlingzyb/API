@@ -82,12 +82,16 @@ def create_page(access_token):
 
 # ========== 删除旧页面 ==========
 def delete_old_pages(access_token):
+    from zoneinfo import ZoneInfo
     headers = {"Authorization": f"Bearer {access_token}"}
-    cutoff_time = datetime.now(timezone.utc) - timedelta(days=1)
+    
+    # 获取北京时间的“昨天”日期字符串
+    beijing_tz = ZoneInfo("Asia/Shanghai")
+    yesterday_str = (datetime.now(beijing_tz) - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    print(f"🧹 正在删除标题为 '{yesterday_str}' 的页面...")
+    
     pages_url = "https://graph.microsoft.com/v1.0/me/onenote/pages?$top=100"
-
-    print("📄 正在获取 OneNote 页面列表进行清理...")
-
     while pages_url:
         resp = requests.get(pages_url, headers=headers)
         if resp.status_code != 200:
@@ -97,14 +101,12 @@ def delete_old_pages(access_token):
 
         data = resp.json()
         pages = data.get("value", [])
-        print(f"🔍 检查 {len(pages)} 个页面...")
 
         for page in pages:
-            created_time = datetime.fromisoformat(page["createdDateTime"].replace("Z", "+00:00"))
-            if created_time < cutoff_time:
+            title = page.get("title", "")
+            if title == yesterday_str:
                 page_id = page["id"]
-                title = page.get("title", "无标题")
-                print(f"🗑 删除页面: {title} (创建于 {created_time.isoformat()})")
+                print(f"🗑 删除页面: {title} (ID: {page_id})")
 
                 del_resp = requests.delete(
                     f"https://graph.microsoft.com/v1.0/me/onenote/pages/{page_id}",
@@ -116,6 +118,7 @@ def delete_old_pages(access_token):
                     print("❌ 删除失败", del_resp.status_code, del_resp.text)
 
         pages_url = data.get("@odata.nextLink", None)
+
 
 # ========== 主函数 ==========
 if __name__ == "__main__":
