@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 # ========== 获取 access_token ==========
 def get_access_token():
-    client_id = s.environ["CLIENT_ID"]
+    client_id = os.environ["CLIENT_ID"]
     client_secret = os.environ["CLIENT_SECRET"]
     tenant_id = os.environ["TENANT_ID"]
     refresh_token = os.environ["GRAPH_REFRESH_TOKEN"]
