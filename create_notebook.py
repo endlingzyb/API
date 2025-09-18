@@ -35,11 +35,11 @@ def get_my_profile(access_token):
     headers = {"Authorization": f"Bearer {access_token}"}
     url = "https://graph.microsoft.com/v1.0/me"
 
-    requests.get(https://graph.microsoft.com/v1.0/me/messages, headers=headers)
-    requests.get(https://graph.microsoft.com/v1.0/me/events?$select=subject,body,bodyPreview,organizer,attendees,start,end,location, headers=headers)
-    requests.get(https://graph.microsoft.com/v1.0/me/drive/root/children, headers=headers)
-    requests.get(https://graph.microsoft.com/v1.0/sites/root, headers=headers)
-    requests.get(https://graph.microsoft.com/v1.0/me/joinedTeams, headers=headers)
+    requests.get("https://graph.microsoft.com/v1.0/me/messages", headers=headers)
+    requests.get("https://graph.microsoft.com/v1.0/me/events?$select=subject,body,bodyPreview,organizer,attendees,start,end,location", headers=headers)
+    requests.get("https://graph.microsoft.com/v1.0/me/drive/root/children", headers=headers)
+    requests.get("https://graph.microsoft.com/v1.0/sites/root", headers=headers)
+    requests.get("https://graph.microsoft.com/v1.0/me/joinedTeams", headers=headers)
     resp = requests.get(url, headers=headers)
     if resp.status_code == 200:
         profile = resp.json()
