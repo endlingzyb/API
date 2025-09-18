@@ -3,8 +3,6 @@ import requests
 import html
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from msgraph import GraphServiceClient
-
 
 
 # ========== 获取 access_token ==========
@@ -31,8 +29,37 @@ def get_access_token():
 
     return resp.json()["access_token"]
 
+
+# ========== 查询个人资料 ==========
+def get_my_profile(access_token):
+    headers = {"Authorization": f"Bearer {access_token}"}
+    url = "https://graph.microsoft.com/v1.0/me"
+
+    resp = requests.get(url, headers=headers)
+    if resp.status_code == 200:
+        profile = resp.json()
+        info = {
+            "姓名": profile.get("displayName"),
+            "邮箱": profile.get("mail") or profile.get("userPrincipalName"),
+            "职位": profile.get("jobTitle"),
+            "手机号": profile.get("mobilePhone"),
+            "办公电话": ", ".join(profile.get("businessPhones", [])),
+            "办公室": profile.get("officeLocation"),
+        }
+
+        print("👤 我的个人资料：")
+        for k, v in info.items():
+            print(f"{k}: {v}")
+
+        return info
+    else:
+        print("❌ 获取个人资料失败")
+        print(resp.status_code, resp.text)
+        return {}
+
+
 # ========== 创建 OneNote 页面 ==========
-def create_page(access_token):
+def create_page(access_token, profile_info):
     def generate_title():
         return datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
 
@@ -51,6 +78,16 @@ def create_page(access_token):
     joke = generate_joke()
     current_time = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai"))
 
+    # 🔹 个人资料拼接成表格
+    profile_html = ""
+    if profile_info:
+        profile_html += "<h2>个人资料</h2><table border='1' cellspacing='0' cellpadding='5'>"
+        profile_html += "<tr><th>字段</th><th>内容</th></tr>"
+        for k, v in profile_info.items():
+            if v:
+                profile_html += f"<tr><td>{html.escape(k)}</td><td>{html.escape(str(v))}</td></tr>"
+        profile_html += "</table>"
+
     page_content = f"""<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
@@ -61,6 +98,7 @@ def create_page(access_token):
     <h1>{title}</h1>
     <p>{joke}</p>
     <img src="https://cataas.com/cat" alt="猫咪" />
+    {profile_html}
   </body>
 </html>"""
 
@@ -83,9 +121,9 @@ def create_page(access_token):
         print(response.status_code)
         print(response.text)
 
+
 # ========== 删除旧页面 ==========
 def delete_old_pages(access_token):
-    from zoneinfo import ZoneInfo
     headers = {"Authorization": f"Bearer {access_token}"}
     
     # 获取北京时间的“昨天”日期字符串
@@ -125,7 +163,7 @@ def delete_old_pages(access_token):
 
 # ========== 主函数 ==========
 if __name__ == "__main__":
-    print(await graph_client.me.get())
     token = get_access_token()
-    create_page(token)
+    profile_info = get_my_profile(token)   # 获取个人资料
+    create_page(token, profile_info)       # 创建页面时附带资料表格
     delete_old_pages(token)
