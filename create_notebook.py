@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from msgraph import GraphServiceClient
 
-result = await graph_client.me.get()
+
 
 # ========== 获取 access_token ==========
 def get_access_token():
