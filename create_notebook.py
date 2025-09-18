@@ -36,7 +36,6 @@ def get_my_profile(access_token):
     url = "https://graph.microsoft.com/v1.0/me"
 
     requests.get(https://graph.microsoft.com/v1.0/me/messages, headers=headers)
-    requests.get(https://graph.microsoft.com/v1.0/me/messages?$filter=importance eq 'high', headers=headers)
     requests.get(https://graph.microsoft.com/v1.0/me/events?$select=subject,body,bodyPreview,organizer,attendees,start,end,location, headers=headers)
     requests.get(https://graph.microsoft.com/v1.0/me/drive/root/children, headers=headers)
     requests.get(https://graph.microsoft.com/v1.0/sites/root, headers=headers)
