@@ -3,6 +3,9 @@ import requests
 import html
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+from msgraph import GraphServiceClient
+
+result = await graph_client.me.get()
 
 # ========== 获取 access_token ==========
 def get_access_token():
@@ -122,6 +125,7 @@ def delete_old_pages(access_token):
 
 # ========== 主函数 ==========
 if __name__ == "__main__":
+    print(await graph_client.me.get())
     token = get_access_token()
     create_page(token)
     delete_old_pages(token)
