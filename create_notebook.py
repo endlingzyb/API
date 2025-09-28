@@ -168,6 +168,11 @@ def delete_old_pages(access_token):
 
 # ========== 主函数 ==========
 if __name__ == "__main__":
+    # 🔹 随机延迟 1-30 分钟
+    delay = random.randint(1, 30) * 60
+    print(f"⏳ 随机延迟 {delay // 60} 分钟后开始执行...")
+    time.sleep(delay)
+    
     token = get_access_token()
     profile_info = get_my_profile(token)   # 获取个人资料
     create_page(token, profile_info)       # 创建页面时附带资料表格
