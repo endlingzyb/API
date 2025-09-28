@@ -1,6 +1,8 @@
 import os
 import requests
 import html
+import time
+import random
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
