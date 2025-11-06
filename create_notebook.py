@@ -171,7 +171,7 @@ def delete_old_pages(access_token):
 # ========== 主函数 ==========
 if __name__ == "__main__":
     # 🔹 随机延迟 1-30 分钟
-    delay = random.randint(1, 30) * 60
+    delay = random.randint(1, 5) * 60
     print(f"⏳ 随机延迟 {delay // 60} 分钟后开始执行...")
     time.sleep(delay)
     
