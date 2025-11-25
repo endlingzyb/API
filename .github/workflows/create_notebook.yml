@@ -9,13 +9,12 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    - cron: 3 6 * * *
-    - cron: 17 16 * * *
     # ✅ 每个工作日（周一到周五）执行一次（UTC 9:00，相当于北京17:00）
     - cron: '0 9 * * 1-5'
+    - cron: '0 11 * * 1-5'
 
     # ✅ 每隔两天执行一次（UTC 2:00）
-    - cron: '0 12 */2 * *'
+    - cron: '0 12 * * 1'
 
 jobs:
   create_notebook:
