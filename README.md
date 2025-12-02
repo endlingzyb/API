@@ -65,8 +65,43 @@
 
 用 `main.md` 中的代码替换 `Main.class` 中的代码，并把在 `resources` 目录中的 `officeE5.properties` 文件中的值替换成自己的
 
+## Unsplash 图片自动下载功能
+
+### 功能说明
+每天北京时间早晨 10:06 自动从 Unsplash API 获取一张热门图片，并上传到 OneDrive 的 `Pictures\Unsplash` 目录下。
+
+### 配置步骤
+
+1. ##### 获取 Unsplash Access Key
+
+   - 访问 [Unsplash Developers](https://unsplash.com/developers) 并注册账号
+   - 创建一个新的应用（Application）
+   - 复制 **Access Key**
+
+2. ##### 在 GitHub 仓库中添加 Unsplash Secret
+
+| name                | secrets           | 说明                    |
+| :------------------ | :---------------- | :---------------------- |
+| UNSPLASH_ACCESS_KEY | Unsplash Access Key | 用于访问 Unsplash API   |
+
+在项目的 `Settings` -> `Secrets and variables` -> `Actions` 中添加该 secret。
+
+3. ##### 工作流说明
+
+   - 文件位置：`.github/workflows/unsplash_to_onedrive.yml`
+   - 执行时间：每天北京时间 10:06（UTC 02:06）
+   - 脚本文件：`unsplash_to_onedrive.py`
+   - 图片保存路径：OneDrive 的 `Pictures/Unsplash/` 目录
+   - 文件命名格式：`YYYYMMDD_HHMMSS_图片ID.jpg`
+
+4. ##### 手动触发
+
+   可以在 GitHub Actions 页面手动触发该工作流进行测试。
+
 ## 参考链接
 
 [yml文件配置](https://github.com/moreant/auto-checkin-biliob)
 
 [Microsoft Graph SKDK 邮件API](https://docs.microsoft.com/zh-cn/graph/api/user-list-messages?view=graph-rest-1.0&tabs=http)
+
+[Unsplash API 文档](https://unsplash.com/documentation)
