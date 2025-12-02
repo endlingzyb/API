@@ -1,22 +1,35 @@
-> 通过GitHub Action 实现自动化调用Microsoft Graph API [官网SDK地址](https://docs.microsoft.com/zh-cn/graph/sdks/sdk-installation?view=graph-rest-1.0)
+# Microsoft 365 E5 自动续期 & Unsplash 壁纸同步
 
-## 前提：
+通过 GitHub Action 实现自动化调用 Microsoft Graph API 以保持 E5 开发者账户活跃，并集成 Unsplash 图片自动同步功能。
 
-##### 已经加入了Microsoft 365 开发人员计划 [链接](https://developer.microsoft.com/zh-cn/microsoft-365/dev-program)
+[官网 SDK 文档](https://docs.microsoft.com/zh-cn/graph/sdks/sdk-installation?view=graph-rest-1.0) | [Microsoft 365 开发人员计划](https://developer.microsoft.com/zh-cn/microsoft-365/dev-program)
 
-## 使用：
-> 由于需要储存密码，如果担心默认管理员账号安全性可以新建一个专用于设置自动续期的账户（小号）。
-> 
-> 这个小号需要先设置为全局管理员以方便操作，直到完成所有第2部分的步骤。
-> 
-> 完成所有步骤并且测试运行后可以在E5-Office控制面板取消该账号全局管理员，自动续订依然能正常运行
+-----
 
-1. ##### 登录到Microsoft  Azure [链接](https://portal.azure.com/)
+## 📋 前提条件
 
-2. ##### 注册新应用，新建客户端密码，跟着图片操作，其中 `1` `2` `3` 要记下来
-   
+  * **已加入 Microsoft 365 开发人员计划**：[点击前往](https://developer.microsoft.com/zh-cn/microsoft-365/dev-program)
 
-![image-20201220181608269](md_img/image-20201220181608269.png)
+> **⚠️ 关于账号安全的建议**
+>
+> 由于需要储存密码，如果担心默认管理员账号安全性，建议新建一个**专用于设置自动续期的账户（小号）**。
+>
+> 1.  该小号需先设置为**全局管理员**以方便后续操作（直到完成所有“配置步骤”）。
+> 2.  完成配置并测试运行成功后，可以在 E5-Office 控制面板取消该账号的全局管理员权限，自动续订脚本依然能正常运行。
+
+-----
+
+## 🛠️ 配置步骤
+
+### 1\. 注册 Azure 应用
+
+1.  登录到 **[Microsoft Azure Portal](https://portal.azure.com/)**。
+
+2.  **注册新应用**并**新建客户端密码**。请参考下方截图操作。
+
+      * **注意**：在此过程中，请务必记录下生成的 **`1` (Client ID)**、**`2` (Client Secret)** 和 **`3` (Tenant ID)**，后续步骤需要用到。
+
+    ![image-20201220181608269](md_img/image-20201220181608269.png)
     
 ![image-20201220181906371](md_img/image-20201220181906371.png)
     
@@ -31,77 +44,114 @@
 ![image-20201220183623883](md_img/image-20201220183623883.png)
     
 ![image-20201220183801992](md_img/image-20201220183801992.png)
-    
-![image-20201220183854762](md_img/image-20201220183854762.png)
+### 2\. 获取 GRAPH\_REFRESH\_TOKEN
 
-3. ##### 在GitHub仓库中添加 `secrets`
+为了支持无人值守运行，需要获取 Refresh Token。
 
-| name          | secrets                                              | No.  |
-| :------------ | :--------------------------------------------------- | :--: |
-| CLIENT_ID     | 应用程序(客户端) ID                                  |  1   |
-| CLIENT_SECRET | 证书和密码中的"客户端密码"                           |  3   |
-| TENANT_ID   | 目录(租户) ID                                        |  2   |
+#### 2.1 配置重定向 URI 和权限
 
-> **其中的 `TOKEN` 获取在GitHub `Setting` -> `Developer settings`  -> `Personal access tokens` 中获取，用于更新日志**<br>
-> **或者[点击这里](https://github.com/settings/tokens/new)新建一个 Personal access token，命名随意**
+1.  在应用的「**身份验证 (Authentication)**」页面，添加平台：
+      * **类型**：Web
+      * **重定向 URI**：`http://localhost`
+      * **注意**：如果需要用户交互，请确保勾选“允许公共客户端流 (allow public client flows)”。
+2.  在「**API 权限 (API Permissions)**」页面，添加权限：
+      * `User.Read`
+      * `offline_access` (**必须添加**，否则不会返回 refresh\_token)
 
-![image-20201220190941252](md_img/image-20201220190941252.png)
+#### 2.2 获取授权码 (Code)
 
-![image-20201220191133945](md_img/image-20201220191133945.png)
+在浏览器中构造并访问以下 URL（请替换 `{tenant_id}` 和 `{client_id}`）：
 
-> **在项目中的 `setting` 里面添加**
+```text
+https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize?client_id={client_id}&response_type=code&redirect_uri=http://localhost&response_mode=query&scope=offline_access%20User.Read&state=12345
+```
 
-![image-20201220184333113](md_img/image-20201220184333113.png)
+**参数说明：**
 
-> **在`setting`-`Actions`-`General`里`Workflow permissions`选择“Read and write permissions”权限，否则push log会失败**
+  * `client_id`: 你的应用注册里的应用程序(客户端) ID
+  * `tenant_id`: 你的 Azure AD 目录(租户) ID
+  * `redirect_uri`: 必须和应用注册里配置的一致 (例如 `http://localhost`)
+  * `scope`: 必须包含 `offline_access` 才会返回 refresh\_token
+  * `response_type=code`: 表示请求授权码
 
-4. ##### 修改 [`.github/workflows`](/.github/workflows)中的`main.yml`，修改成自己的用户名和邮箱
+#### 2.3 登录并同意授权
 
-![image-20210124211449573](md_img/image-20210124211449573.png)
+1.  访问上述 URL 后，系统会跳转到微软登录页。
+2.  输入账号密码，完成验证。如果是第一次登录，会弹出“同意授权”页面，点击**同意**。
 
-5. ##### 最后必须要自己 `star` 一下才会开始运行，测试的的时候只要点两次就好了（取消star，然后再star）
+#### 2.4 提取 Code
 
-## 本地
+登录完成后，浏览器会跳转到类似以下的网址（显示无法访问是正常的）：
 
-用 `main.md` 中的代码替换 `Main.class` 中的代码，并把在 `resources` 目录中的 `officeE5.properties` 文件中的值替换成自己的
+```text
+http://localhost/?code=0.AAAA...snip...AA&state=12345&session_state=abcd-efgh
+```
 
-## Unsplash 图片自动下载功能
+  * 复制 `code=` 之后的内容（即 `0.AAAA...` 这一长串）。
+  * **注意**：此 Code 有效期极短，请尽快用于后续 Token 兑换（或填入 Secrets 供脚本第一次运行使用，具体视脚本逻辑而定）。
+
+### 3\. 配置 GitHub Secrets
+
+进入 GitHub 仓库的 `Settings` -\> `Secrets and variables` -\> `Actions`，添加以下 Secrets：
+
+| Name | Value 说明 | 对应之前记录的编号 |
+| :--- | :--- | :---: |
+| **CLIENT\_ID** | 应用程序(客户端) ID | No. 1 |
+| **CLIENT\_SECRET** | 证书和密码中的"客户端密码" | No. 2 |
+| **TENANT\_ID** | 目录(租户) ID | No. 3 |
+| **GRAPH\_REFRESH\_TOKEN** | 身份验证 Token (或上一步获取的 Code) | No. 4 |
+
+> **⚠️ 权限设置提醒**
+>
+> 1.  确保 Secrets 添加正确，如上图所示：
+
+
+### 4\. 启动运行
+
+最后，你需要手动 **Star** 一下本仓库才会触发首次运行。
+
+  * **测试方法**：Star 本仓库 -\> 取消 Star -\> 再次 Star（点两次）。
+
+-----
+
+## 🖼️ 附加功能：Unsplash 图片自动下载
 
 ### 功能说明
-每天北京时间早晨 10:06 自动从 Unsplash API 获取一张热门图片，并上传到 OneDrive 的 `Pictures\Unsplash` 目录下。
+
+此功能会在每天 **北京时间早晨 10:06** 自动从 Unsplash API 获取一张热门图片，并上传到 OneDrive 的 `Pictures\Unsplash` 目录下。
 
 ### 配置步骤
 
-1. ##### 获取 Unsplash Access Key
+#### 1\. 获取 Unsplash Access Key
 
-   - 访问 [Unsplash Developers](https://unsplash.com/developers) 并注册账号
-   - 创建一个新的应用（Application）
-   - 复制 **Access Key**
+1.  访问 [Unsplash Developers](https://unsplash.com/developers) 并注册账号。
+2.  创建一个新的应用（Application）。
+3.  复制生成的 **Access Key**。
 
-2. ##### 在 GitHub 仓库中添加 Unsplash Secret
+#### 2\. 添加 GitHub Secret
 
-| name                | secrets           | 说明                    |
-| :------------------ | :---------------- | :---------------------- |
-| UNSPLASH_ACCESS_KEY | Unsplash Access Key | 用于访问 Unsplash API   |
+在仓库的 `Settings` -\> `Secrets and variables` -\> `Actions` 中追加以下 Secret：
 
-在项目的 `Settings` -> `Secrets and variables` -> `Actions` 中添加该 secret。
+| Name | Value | 说明 |
+| :--- | :--- | :--- |
+| **UNSPLASH\_ACCESS\_KEY** | 你的 Unsplash Access Key | 用于访问 Unsplash API |
 
-3. ##### 工作流说明
+#### 3\. 工作流详情
 
-   - 文件位置：`.github/workflows/unsplash_to_onedrive.yml`
-   - 执行时间：每天北京时间 10:06（UTC 02:06）
-   - 脚本文件：`unsplash_to_onedrive.py`
-   - 图片保存路径：OneDrive 的 `Pictures/Unsplash/` 目录
-   - 文件命名格式：`YYYYMMDD_HHMMSS_图片ID.jpg`
+  * **配置文件**：`.github/workflows/unsplash_to_onedrive.yml`
+  * **执行时间**：每天北京时间 10:06 (UTC 02:06)
+  * **脚本文件**：`unsplash_to_onedrive.py`
+  * **保存路径**：OneDrive `/Pictures/Unsplash/`
+  * **命名格式**：`YYYYMMDD_HHMMSS_图片ID.jpg`
 
-4. ##### 手动触发
+#### 4\. 手动触发
 
-   可以在 GitHub Actions 页面手动触发该工作流进行测试。
+配置完成后，你可以在 GitHub Actions 页面选中 `unsplash_to_onedrive` 工作流并手动触发以进行测试。
 
-## 参考链接
+-----
 
-[yml文件配置](https://github.com/moreant/auto-checkin-biliob)
+## 🔗 参考链接
 
-[Microsoft Graph SKDK 邮件API](https://docs.microsoft.com/zh-cn/graph/api/user-list-messages?view=graph-rest-1.0&tabs=http)
-
-[Unsplash API 文档](https://unsplash.com/documentation)
+  * [GitHub Action YML 文件配置参考](https://github.com/moreant/auto-checkin-biliob)
+  * [Microsoft Graph SDK - 邮件 API](https://docs.microsoft.com/zh-cn/graph/api/user-list-messages?view=graph-rest-1.0&tabs=http)
+  * [Unsplash API 文档](https://unsplash.com/documentation)
