@@ -20,7 +20,7 @@ def get_access_token():
         "scope": "https://graph.microsoft.com/.default offline_access"
     }
 
-    resp = requests.post(token_url, data=data)
+    resp = requests.post(token_url, data=data, timeout=30)
     if resp.status_code != 200:
         print("❌ 获取 access_token 失败")
         print(resp.text)
@@ -52,14 +52,19 @@ def get_unsplash_image():
     }
     
     print("📷 正在从 Unsplash 获取热门图片...")
-    resp = requests.get(url, headers=headers, params=params)
+    resp = requests.get(url, headers=headers, params=params, timeout=30)
     
     if resp.status_code != 200:
         print(f"❌ 获取 Unsplash 图片失败: {resp.status_code}")
         print(resp.text)
         exit(1)
     
-    data = resp.json()
+    try:
+        data = resp.json()
+    except Exception as e:
+        print(f"❌ 解析 JSON 响应失败: {e}")
+        exit(1)
+    
     image_id = data["id"]
     download_url = data["urls"]["raw"]  # 获取原始质量图片
     photographer = data["user"]["name"]
@@ -82,19 +87,20 @@ def get_unsplash_image():
 def download_image(image_url):
     """
     下载图片到内存
-    返回图片的二进制数据
+    返回图片的二进制数据和内容类型
     """
     print(f"⬇️  正在下载图片...")
-    resp = requests.get(image_url, stream=True)
+    resp = requests.get(image_url, stream=True, timeout=60)
     
     if resp.status_code != 200:
         print(f"❌ 下载图片失败: {resp.status_code}")
         exit(1)
     
     image_data = resp.content
-    print(f"✅ 图片下载成功 ({len(image_data)} 字节)")
+    content_type = resp.headers.get('Content-Type', 'image/jpeg')
+    print(f"✅ 图片下载成功 ({len(image_data)} 字节, {content_type})")
     
-    return image_data
+    return image_data, content_type
 
 
 # ========== 确保 OneDrive 目录存在 ==========
@@ -115,7 +121,7 @@ def ensure_onedrive_folder(access_token, folder_path):
         
         # 检查文件夹是否存在
         check_url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{current_path}"
-        resp = requests.get(check_url, headers=headers)
+        resp = requests.get(check_url, headers=headers, timeout=30)
         
         if resp.status_code == 404:
             # 文件夹不存在，创建它
@@ -127,17 +133,21 @@ def ensure_onedrive_folder(access_token, folder_path):
             data = {
                 "name": part,
                 "folder": {},
-                "@microsoft.graph.conflictBehavior": "fail"
+                "@microsoft.graph.conflictBehavior": "rename"
             }
             
-            create_resp = requests.post(create_url, headers=headers, json=data)
+            create_resp = requests.post(create_url, headers=headers, json=data, timeout=30)
             
             if create_resp.status_code not in [200, 201]:
-                print(f"❌ 创建文件夹失败: {create_resp.status_code}")
-                print(create_resp.text)
-                exit(1)
-            
-            print(f"✅ 文件夹创建成功: {current_path}")
+                # 如果是 409 冲突，说明文件夹可能在并发创建中已存在
+                if create_resp.status_code == 409:
+                    print(f"⚠️  文件夹可能已存在: {current_path}")
+                else:
+                    print(f"❌ 创建文件夹失败: {create_resp.status_code}")
+                    print(create_resp.text)
+                    exit(1)
+            else:
+                print(f"✅ 文件夹创建成功: {current_path}")
         elif resp.status_code == 200:
             print(f"✅ 文件夹已存在: {current_path}")
         else:
@@ -147,13 +157,22 @@ def ensure_onedrive_folder(access_token, folder_path):
 
 
 # ========== 上传图片到 OneDrive ==========
-def upload_to_onedrive(access_token, image_data, image_info):
+def upload_to_onedrive(access_token, image_data, image_info, content_type):
     """
     将图片上传到 OneDrive 的 Pictures/Unsplash 文件夹
     """
-    # 生成文件名：日期_图片ID.jpg
+    # 根据 Content-Type 确定文件扩展名
+    extension = '.jpg'  # 默认
+    if 'png' in content_type.lower():
+        extension = '.png'
+    elif 'webp' in content_type.lower():
+        extension = '.webp'
+    elif 'gif' in content_type.lower():
+        extension = '.gif'
+    
+    # 生成文件名：日期_图片ID.扩展名
     beijing_time = datetime.now(ZoneInfo("Asia/Shanghai"))
-    filename = f"{beijing_time.strftime('%Y%m%d_%H%M%S')}_{image_info['id']}.jpg"
+    filename = f"{beijing_time.strftime('%Y%m%d_%H%M%S')}_{image_info['id']}{extension}"
     
     # 确保目录存在
     ensure_onedrive_folder(access_token, "Pictures/Unsplash")
@@ -166,14 +185,18 @@ def upload_to_onedrive(access_token, image_data, image_info):
     }
     
     print(f"⬆️  正在上传图片到 OneDrive: {filename}")
-    resp = requests.put(upload_url, headers=headers, data=image_data)
+    resp = requests.put(upload_url, headers=headers, data=image_data, timeout=120)
     
     if resp.status_code not in [200, 201]:
         print(f"❌ 上传失败: {resp.status_code}")
         print(resp.text)
         exit(1)
     
-    result = resp.json()
+    try:
+        result = resp.json()
+    except Exception as e:
+        print(f"❌ 解析上传响应失败: {e}")
+        exit(1)
     print(f"✅ 图片上传成功！")
     print(f"   文件名: {filename}")
     print(f"   路径: Pictures/Unsplash/{filename}")
@@ -196,9 +219,9 @@ if __name__ == "__main__":
     image_info = get_unsplash_image()
     
     # 下载图片
-    image_data = download_image(image_info["url"])
+    image_data, content_type = download_image(image_info["url"])
     
     # 上传到 OneDrive
-    upload_to_onedrive(access_token, image_data, image_info)
+    upload_to_onedrive(access_token, image_data, image_info, content_type)
     
     print("🎉 任务完成！")
