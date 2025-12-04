@@ -3,7 +3,7 @@ import requests
 import html
 import time
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 
@@ -65,11 +65,134 @@ def get_my_profile(access_token):
         return {}
 
 
+# ========== 获取或创建笔记本 ==========
+def get_or_create_notebook(access_token, notebook_name="MyNotes"):
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    # 获取所有笔记本
+    notebooks_url = "https://graph.microsoft.com/v1.0/me/onenote/notebooks"
+    resp = requests.get(notebooks_url, headers=headers)
+    
+    if resp.status_code != 200:
+        print("❌ 获取笔记本失败")
+        print(resp.text)
+        exit(1)
+    
+    notebooks = resp.json().get("value", [])
+    
+    # 查找现有笔记本
+    for notebook in notebooks:
+        if notebook.get("displayName") == notebook_name:
+            print(f"✅ 找到笔记本: {notebook_name}")
+            return notebook["id"]
+    
+    # 创建新笔记本
+    print(f"📓 创建新笔记本: {notebook_name}")
+    create_resp = requests.post(
+        notebooks_url,
+        headers=headers,
+        json={"displayName": notebook_name}
+    )
+    
+    if create_resp.status_code == 201:
+        notebook_id = create_resp.json()["id"]
+        print(f"✅ 笔记本创建成功: {notebook_id}")
+        return notebook_id
+    else:
+        print("❌ 创建笔记本失败")
+        print(create_resp.text)
+        exit(1)
+
+
+# ========== 获取或创建分区 ==========
+def get_or_create_section(access_token, notebook_id, section_name):
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    # 获取笔记本的所有分区
+    sections_url = f"https://graph.microsoft.com/v1.0/me/onenote/notebooks/{notebook_id}/sections"
+    resp = requests.get(sections_url, headers=headers)
+    
+    if resp.status_code != 200:
+        print("❌ 获取分区失败")
+        print(resp.text)
+        exit(1)
+    
+    sections = resp.json().get("value", [])
+    
+    # 查找现有分区
+    for section in sections:
+        if section.get("displayName") == section_name:
+            print(f"✅ 找到分区: {section_name}")
+            return section["id"]
+    
+    # 创建新分区
+    print(f"📑 创建新分区: {section_name}")
+    create_resp = requests.post(
+        sections_url,
+        headers=headers,
+        json={"displayName": section_name}
+    )
+    
+    if create_resp.status_code == 201:
+        section_id = create_resp.json()["id"]
+        print(f"✅ 分区创建成功: {section_id}")
+        return section_id
+    else:
+        print("❌ 创建分区失败")
+        print(create_resp.text)
+        exit(1)
+
+
+# ========== 获取 OneDrive 图片 ==========
+def get_random_image_from_onedrive(access_token):
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    # 获取 Pictures/Unsplash 目录下的文件
+    folder_path = "Pictures/Unsplash"
+    encoded_path = requests.utils.quote(folder_path)
+    url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_path}:/children"
+    
+    resp = requests.get(url, headers=headers)
+    
+    if resp.status_code != 200:
+        print(f"❌ 获取 OneDrive 图片失败: {resp.status_code}")
+        print(resp.text)
+        return None
+    
+    files = resp.json().get("value", [])
+    
+    # 过滤出图片文件
+    image_files = [f for f in files if f.get("file") and any(f["name"].lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp'])]
+    
+    if not image_files:
+        print("❌ OneDrive 中没有找到图片")
+        return None
+    
+    # 按文件名排序（假设文件名以日期开头，如 YYYYMMDD_HHMMSS_xxx.jpg）
+    image_files.sort(key=lambda x: x["name"], reverse=True)
+    
+    # 尝试获取当天的图片（文件名需以 YYYYMMDD 开头）
+    beijing_time = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai"))
+    today_str = beijing_time.strftime("%Y%m%d")
+    
+    # 尝试找到当天的图片
+    today_image = None
+    for img in image_files:
+        if img["name"].startswith(today_str):
+            today_image = img
+            break
+    
+    # 如果找不到当天的图片，使用最新的图片
+    selected_image = today_image if today_image else image_files[0]
+    
+    print(f"✅ 选择图片: {selected_image['name']}")
+    
+    # 获取图片的下载链接
+    return selected_image.get("@microsoft.graph.downloadUrl")
+
+
 # ========== 创建 OneNote 页面 ==========
 def create_page(access_token, profile_info):
-    def generate_title():
-        return datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
-
     def generate_joke():
         try:
             headers = {"Accept": "application/json"}
@@ -81,10 +204,31 @@ def create_page(access_token, profile_info):
         except Exception:
             return "获取笑话异常 🥲"
 
-    title = generate_title()
-    joke = generate_joke()
+    # 获取北京时间
     current_time = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai"))
-
+    
+    # 页面标题格式：DD日HH:MM
+    title = current_time.strftime("%d日%H:%M")
+    
+    # 月份分区名称：YYYY年MM月
+    section_name = current_time.strftime("%Y年%m月")
+    
+    joke = generate_joke()
+    
+    # 获取或创建笔记本和分区
+    notebook_id = get_or_create_notebook(access_token, "MyNotes")
+    section_id = get_or_create_section(access_token, notebook_id, section_name)
+    
+    # 获取 OneDrive 图片
+    image_url = get_random_image_from_onedrive(access_token)
+    
+    # 图片 HTML
+    image_html = ""
+    if image_url:
+        image_html = f'<img src="{html.escape(image_url)}" alt="每日图片" />'
+    else:
+        image_html = '<p>未找到图片</p>'
+    
     # 🔹 个人资料拼接成表格
     profile_html = ""
     if profile_info:
@@ -104,7 +248,7 @@ def create_page(access_token, profile_info):
   <body>
     <h1>{title}</h1>
     <p>{joke}</p>
-    <img src="https://cataas.com/cat" alt="猫咪" />
+    {image_html}
     {profile_html}
   </body>
 </html>"""
@@ -114,8 +258,9 @@ def create_page(access_token, profile_info):
         "Content-Type": "application/xhtml+xml"
     }
 
+    # 创建页面到指定分区
     response = requests.post(
-        "https://graph.microsoft.com/v1.0/me/onenote/pages",
+        f"https://graph.microsoft.com/v1.0/me/onenote/sections/{section_id}/pages",
         headers=headers,
         data=page_content
     )
@@ -129,53 +274,15 @@ def create_page(access_token, profile_info):
         print(response.text)
 
 
-# ========== 删除旧页面 ==========
-def delete_old_pages(access_token):
-    headers = {"Authorization": f"Bearer {access_token}"}
-    
-    # 获取北京时间的“昨天”日期字符串
-    beijing_tz = ZoneInfo("Asia/Shanghai")
-    yesterday_str = (datetime.now(beijing_tz) - timedelta(days=1)).strftime("%Y-%m-%d")
-    
-    print(f"🧹 正在删除标题为 '{yesterday_str}' 的页面...")
-    
-    pages_url = "https://graph.microsoft.com/v1.0/me/onenote/pages?$top=100"
-    while pages_url:
-        resp = requests.get(pages_url, headers=headers)
-        if resp.status_code != 200:
-            print("❌ 获取页面失败")
-            print(resp.text)
-            break
-
-        data = resp.json()
-        pages = data.get("value", [])
-
-        for page in pages:
-            title = page.get("title", "")
-            if title == yesterday_str:
-                page_id = page["id"]
-                print(f"🗑 删除页面: {title} (ID: {page_id})")
-
-                del_resp = requests.delete(
-                    f"https://graph.microsoft.com/v1.0/me/onenote/pages/{page_id}",
-                    headers=headers
-                )
-                if del_resp.status_code == 204:
-                    print("✅ 删除成功")
-                else:
-                    print("❌ 删除失败", del_resp.status_code, del_resp.text)
-
-        pages_url = data.get("@odata.nextLink", None)
 
 
 # ========== 主函数 ==========
 if __name__ == "__main__":
-    # 🔹 随机延迟 1-30 分钟
-    delay = random.randint(1, 5) * 60
-    print(f"⏳ 随机延迟 {delay // 60} 分钟后开始执行...")
+    # 🔹 随机延迟 5-30 秒
+    delay = random.randint(5, 30)
+    print(f"⏳ 随机延迟 {delay} 秒后开始执行...")
     time.sleep(delay)
     
     token = get_access_token()
     profile_info = get_my_profile(token)   # 获取个人资料
     create_page(token, profile_info)       # 创建页面时附带资料表格
-    delete_old_pages(token)
