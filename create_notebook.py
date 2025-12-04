@@ -168,10 +168,10 @@ def get_random_image_from_onedrive(access_token):
         print("❌ OneDrive 中没有找到图片")
         return None
     
-    # 按名称排序，选择最新的图片（文件名包含日期）
+    # 按文件名排序（假设文件名以日期开头，如 YYYYMMDD_HHMMSS_xxx.jpg）
     image_files.sort(key=lambda x: x["name"], reverse=True)
     
-    # 获取当天的图片（文件名格式：YYYYMMDD_HHMMSS_xxx.jpg）
+    # 尝试获取当天的图片（文件名需以 YYYYMMDD 开头）
     beijing_time = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai"))
     today_str = beijing_time.strftime("%Y%m%d")
     
