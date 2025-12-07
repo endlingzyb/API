@@ -8,7 +8,7 @@ except ImportError:
     from backports.zoneinfo import ZoneInfo
 
 # ==============================================================================
-# 全局常量定义 (新增)
+# 全局常量定义
 # ==============================================================================
 
 # 每次获取的图片数量 (每种方向 3 张)
@@ -18,7 +18,7 @@ IMAGE_COUNT_PER_ORIENTATION = 3
 RES_LANDSCAPE = "2560x1440" # 横版 2K (宽x高)
 RES_PORTRAIT = "1440x2560"  # 竖版 2K (宽x高)
 
-# 目标文件夹路径 (保持基础路径不变，并定义子路径)
+# 目标文件夹路径
 BASE_FOLDER = "Pictures/Unsplash"
 LANDSCAPE_FOLDER = f"{BASE_FOLDER}/Landscape"
 PORTRAIT_FOLDER = f"{BASE_FOLDER}/Portrait"
@@ -58,7 +58,7 @@ def get_access_token():
 
 
 # ==============================================================================
-# Unsplash 数据获取函数 (修改)
+# Unsplash 数据获取函数
 # ==============================================================================
 
 # ========== 从 Unsplash 获取指定方向和分辨率的壁纸 ==========
@@ -105,7 +105,8 @@ def get_unsplash_wallpapers_by_orientation(orientation, count):
         base_url = data["urls"]["raw"]
         
         # 动态调整 URL 以获取指定 2K 分辨率的图片
-        # 使用 w, h 和 fit=crop 参数确保图片尺寸精确到 2K
+        # 拼接 w, h 和 fit=crop 参数确保图片尺寸精确到 2K
+        # 注意：base_url 通常已有参数，所以用 & 连接
         dynamic_url = f"{base_url}&w={width}&h={height}&fit=crop"
         
         image_list.append({
@@ -132,7 +133,7 @@ def download_image(image_url):
 
 
 # ==============================================================================
-# OneDrive 操作函数 (修改)
+# OneDrive 操作函数
 # ==============================================================================
 
 # ========== 确保 OneDrive 目录存在 ==========
@@ -190,7 +191,7 @@ def ensure_onedrive_folder(access_token, folder_path):
             exit(1)
 
 
-# ========== 上传图片到 OneDrive (修改：接受 target_folder 参数) ==========
+# ========== 上传图片到 OneDrive ==========
 def upload_to_onedrive(access_token, image_data, image_info, content_type, target_folder):
     """
     将图片二进制数据上传到 OneDrive 的指定文件夹。
@@ -234,20 +235,22 @@ def upload_to_onedrive(access_token, image_data, image_info, content_type, targe
 
 
 # ==============================================================================
-# 主执行逻辑 (修改)
+# 主执行逻辑
 # ==============================================================================
 
 if __name__ == "__main__":
     
-    print(f"⏰ {datetime.now(ZoneInfo('Asia/Shanghai'))} - 🚀 开始获取和上传共 {IMAGE_COUNT_PER_ORIENTATION * 2} 张 2K 壁纸")
+    total_files = IMAGE_COUNT_PER_ORIENTATION * 2
+    print(f"⏰ {datetime.now(ZoneInfo('Asia/Shanghai'))} - 🚀 开始获取和上传共 {total_files} 张 2K 壁纸")
     
     # 1. 获取认证 token
     token = get_access_token()
     
-    # 2. 定义任务列表
+    # 2. 定义任务列表 
+    # (修正：使用正确的常量 IMAGE_COUNT_PER_ORIENTATION)
     tasks = [
-        ("landscape", LANDSCAPE_COUNT, LANDSCAPE_FOLDER),
-        ("portrait", PORTRAIT_COUNT, PORTRAIT_FOLDER),
+        ("landscape", IMAGE_COUNT_PER_ORIENTATION, LANDSCAPE_FOLDER),
+        ("portrait", IMAGE_COUNT_PER_ORIENTATION, PORTRAIT_FOLDER),
     ]
     
     total_processed = 0
@@ -262,7 +265,7 @@ if __name__ == "__main__":
         # 2b. 遍历列表，下载并上传每张图片
         for i, img in enumerate(image_list):
             total_processed += 1
-            print(f"\n--- 🏞️  处理第 {total_processed} 张图片 (ID: {img['id']}) ---")
+            print(f"\n--- 🏞️  处理第 {total_processed} / {total_files} 张图片 (ID: {img['id']}) ---")
             
             try:
                 # 下载图片
