@@ -7,18 +7,8 @@ try:
 except ImportError:
     from backports.zoneinfo import ZoneInfo
 
-# ==============================================================================
-# 全局常量定义
-# ==============================================================================
-
-# 每次获取的图片数量 (每种方向 3 张)
-IMAGE_COUNT_PER_ORIENTATION = 3
-
-# 目标文件夹路径
-BASE_FOLDER = "Pictures/Unsplash"
-LANDSCAPE_FOLDER = f"{BASE_FOLDER}/Landscape"
-PORTRAIT_FOLDER = f"{BASE_FOLDER}/Portrait"
-
+# 定义一次获取的图片数量
+IMAGE_COUNT = 5
 
 # ==============================================================================
 # 身份验证相关函数
@@ -54,35 +44,33 @@ def get_access_token():
 
 
 # ==============================================================================
-# Unsplash 数据获取函数 (修改：移除分辨率限制)
+# Unsplash 数据获取函数
 # ==============================================================================
 
-# ========== 从 Unsplash 获取指定方向的壁纸 ==========
-def get_unsplash_wallpapers_by_orientation(orientation, count):
+# ========== 从 Unsplash 获取热门壁纸 (5张) ==========
+def get_unsplash_wallpapers():
     """
-    从 Unsplash API 获取指定数量、指定方向的壁纸。
-    不再强制指定分辨率，直接获取 full 尺寸原图。
-    :param orientation: "landscape" (横版) 或 "portrait" (竖版)。
-    :param count: 获取图片的数量。
-    :return: 包含图片信息的列表。
+    从 Unsplash API 获取指定数量 (IMAGE_COUNT) 的热门横向壁纸。
+    返回一个包含图片信息的列表。
     """
     unsplash_access_key = os.environ.get("UNSPLASH_ACCESS_KEY")
     if not unsplash_access_key:
         print("❌ 未设置 UNSPLASH_ACCESS_KEY")
         exit(1)
     
+    # 更改为 /photos 接口，用于获取多张图片
     url = "https://api.unsplash.com/photos"
     headers = {"Authorization": f"Client-ID {unsplash_access_key}"}
     
     # API 参数设置：
     params = {
-        "per_page": count,        # 每次获取数量
+        "per_page": IMAGE_COUNT,  # 每次获取 5 张
         "order_by": "popular",    # 按热门排序
-        "query": "wallpaper",     # 搜索关键词：壁纸
-        "orientation": orientation # 明确指定方向 (landscape 或 portrait)
+        "query": "wallpapers",     # 搜索关键词：壁纸
+        "orientation": "landscape" # 默认获取横向壁纸
     }
     
-    print(f"📷 正在从 Unsplash 获取 {count} 张热门{orientation}壁纸 (不限分辨率)...")
+    print(f"📷 正在从 Unsplash 获取 {IMAGE_COUNT} 张热门壁纸...")
     resp = requests.get(url, headers=headers, params=params, timeout=30)
     
     if resp.status_code != 200:
@@ -91,16 +79,14 @@ def get_unsplash_wallpapers_by_orientation(orientation, count):
         exit(1)
     
     data_list = resp.json()
-    image_list = []
     
+    # 解析并返回一个包含多个图片信息的列表
+    image_list = []
     for data in data_list:
-        # 直接使用 'full' 尺寸，它是 Unsplash 提供的最高质量且适合显示的图片
-        # 如果需要原始未经处理的 raw 文件，可以使用 data["urls"]["raw"]
-        image_url = data["urls"]["full"]
-        
         image_list.append({
             "id": data["id"],
-            "url": image_url, 
+            # 使用 full 尺寸的 url，适合高分辨率壁纸
+            "url": data["urls"]["full"], 
             "photographer": data["user"]["name"],
             "photo_url": data["links"]["html"]
         })
@@ -129,16 +115,19 @@ def download_image(image_url):
 def ensure_onedrive_folder(access_token, folder_path):
     """
     确保 OneDrive 中的文件夹路径存在。如果路径中任一级文件夹不存在，则按顺序创建。
-    该函数能处理多级目录 (如 Pictures/Unsplash/Landscape)。
+    注意：使用 URL 编码处理路径名中的特殊字符。
     """
     headers = {"Authorization": f"Bearer {access_token}"}
     
-    # 分割路径
+    # 分割路径：例如 "Pictures/Unsplash" -> ["Pictures", "Unsplash"]
     path_parts = [p for p in folder_path.split("/") if p]
     current_path = ""
     
+    # 逐级检查和创建文件夹
     for part in path_parts:
+        # parent_path 是当前要创建/检查的文件夹的父级路径
         parent_path = current_path
+        # current_path 是当前要创建/检查的完整路径
         current_path = f"{current_path}/{part}" if current_path else part
         
         # 1. 检查是否存在
@@ -154,12 +143,14 @@ def ensure_onedrive_folder(access_token, folder_path):
             # 2. 不存在，执行创建
             print(f"📁 创建文件夹: {current_path}")
             
+            # 构建创建 API 的 URL
             if not parent_path:
                 create_url = "https://graph.microsoft.com/v1.0/me/drive/root/children"
             else:
                 encoded_parent = urllib.parse.quote(parent_path)
                 create_url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_parent}:/children"
             
+            # 创建请求体
             data = {
                 "name": part,
                 "folder": {},
@@ -181,10 +172,9 @@ def ensure_onedrive_folder(access_token, folder_path):
 
 
 # ========== 上传图片到 OneDrive ==========
-def upload_to_onedrive(access_token, image_data, image_info, content_type, target_folder):
+def upload_to_onedrive(access_token, image_data, image_info, content_type):
     """
-    将图片二进制数据上传到 OneDrive 的指定文件夹。
-    :param target_folder: 上传的目标文件夹路径，例如 "Pictures/Unsplash/Landscape"。
+    将图片二进制数据上传到 OneDrive 的指定文件夹 (Pictures/Unsplash)。
     """
     # 扩展名判断
     extension = '.jpg'
@@ -196,14 +186,15 @@ def upload_to_onedrive(access_token, image_data, image_info, content_type, targe
     beijing_time = datetime.now(ZoneInfo("Asia/Shanghai"))
     filename = f"{beijing_time.strftime('%Y%m%d_%H%M%S')}_{image_info['id']}{extension}"
     
-    # 确保目标路径存在
+    # 目标路径 (恢复到原始路径)
+    target_folder = "Pictures/Unsplash"
     ensure_onedrive_folder(access_token, target_folder)
     
     # 构建完整的 OneDrive 路径并进行 URL 编码
     full_path = f"{target_folder}/{filename}"
     encoded_full_path = urllib.parse.quote(full_path)
     
-    # 上传 URL (使用 @microsoft.graph.conflictBehavior=rename 避免文件名冲突)
+    # 上传 URL
     upload_url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_full_path}:/content?@microsoft.graph.conflictBehavior=rename" 
     
     headers = {
@@ -228,43 +219,28 @@ def upload_to_onedrive(access_token, image_data, image_info, content_type, targe
 # ==============================================================================
 
 if __name__ == "__main__":
-    
-    total_files = IMAGE_COUNT_PER_ORIENTATION * 2
-    print(f"⏰ {datetime.now(ZoneInfo('Asia/Shanghai'))} - 🚀 开始获取和上传共 {total_files} 张壁纸")
+    print(f"⏰ {datetime.now(ZoneInfo('Asia/Shanghai'))} - 🚀 开始获取和上传 {IMAGE_COUNT} 张壁纸")
     
     # 1. 获取认证 token
     token = get_access_token()
     
-    # 2. 定义任务列表 
-    tasks = [
-        ("landscape", IMAGE_COUNT_PER_ORIENTATION, LANDSCAPE_FOLDER),
-        ("portrait", IMAGE_COUNT_PER_ORIENTATION, PORTRAIT_FOLDER),
-    ]
+    # 2. 获取壁纸列表
+    image_list = get_unsplash_wallpapers()
     
-    total_processed = 0
-    
-    for orientation, count, target_folder in tasks:
+    # 3. 遍历列表，下载并上传每张图片
+    for i, img in enumerate(image_list):
+        print(f"\n--- 🏞️  处理第 {i + 1} / {len(image_list)} 张图片 (ID: {img['id']}) ---")
         
-        print(f"\n--- 🔄 开始处理 {orientation} ({count} 张) ---")
-        
-        # 2a. 获取壁纸列表
-        image_list = get_unsplash_wallpapers_by_orientation(orientation, count)
-        
-        # 2b. 遍历列表，下载并上传每张图片
-        for i, img in enumerate(image_list):
-            total_processed += 1
-            print(f"\n--- 🏞️  处理第 {total_processed} / {total_files} 张图片 (ID: {img['id']}) ---")
+        try:
+            # 下载图片
+            data, ctype = download_image(img["url"])
             
-            try:
-                # 下载图片
-                data, ctype = download_image(img["url"])
-                
-                # 上传到 OneDrive，指定子文件夹
-                upload_to_onedrive(token, data, img, ctype, target_folder)
-                
-            except Exception as e:
-                # 捕获异常，打印错误信息，然后继续处理下一张图片
-                print(f"⚠️  处理图片 {img['id']} 时发生错误，跳过该图片: {e}")
-                continue
+            # 上传到 OneDrive
+            upload_to_onedrive(token, data, img, ctype)
+            
+        except Exception as e:
+            # 捕获异常，打印错误信息，然后继续处理下一张图片
+            print(f"⚠️  处理图片 {img['id']} 时发生错误，跳过该图片: {e}")
+            continue
             
     print("\n🎉 任务结束")
