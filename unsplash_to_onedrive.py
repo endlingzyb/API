@@ -14,10 +14,6 @@ except ImportError:
 # 每次获取的图片数量 (每种方向 3 张)
 IMAGE_COUNT_PER_ORIENTATION = 3
 
-# 目标分辨率定义 (2K)
-RES_LANDSCAPE = "2560x1440" # 横版 2K (宽x高)
-RES_PORTRAIT = "1440x2560"  # 竖版 2K (宽x高)
-
 # 目标文件夹路径
 BASE_FOLDER = "Pictures/Unsplash"
 LANDSCAPE_FOLDER = f"{BASE_FOLDER}/Landscape"
@@ -58,25 +54,22 @@ def get_access_token():
 
 
 # ==============================================================================
-# Unsplash 数据获取函数
+# Unsplash 数据获取函数 (修改：移除分辨率限制)
 # ==============================================================================
 
-# ========== 从 Unsplash 获取指定方向和分辨率的壁纸 ==========
+# ========== 从 Unsplash 获取指定方向的壁纸 ==========
 def get_unsplash_wallpapers_by_orientation(orientation, count):
     """
-    从 Unsplash API 获取指定数量、方向和分辨率的壁纸。
+    从 Unsplash API 获取指定数量、指定方向的壁纸。
+    不再强制指定分辨率，直接获取 full 尺寸原图。
     :param orientation: "landscape" (横版) 或 "portrait" (竖版)。
     :param count: 获取图片的数量。
-    :return: 包含图片信息（含动态分辨率 URL）的列表。
+    :return: 包含图片信息的列表。
     """
     unsplash_access_key = os.environ.get("UNSPLASH_ACCESS_KEY")
     if not unsplash_access_key:
         print("❌ 未设置 UNSPLASH_ACCESS_KEY")
         exit(1)
-    
-    # 确定分辨率
-    res_str = RES_LANDSCAPE if orientation == "landscape" else RES_PORTRAIT
-    width, height = res_str.split('x')
     
     url = "https://api.unsplash.com/photos"
     headers = {"Authorization": f"Client-ID {unsplash_access_key}"}
@@ -89,7 +82,7 @@ def get_unsplash_wallpapers_by_orientation(orientation, count):
         "orientation": orientation # 明确指定方向 (landscape 或 portrait)
     }
     
-    print(f"📷 正在从 Unsplash 获取 {count} 张热门{orientation}壁纸 (目标分辨率: {res_str})...")
+    print(f"📷 正在从 Unsplash 获取 {count} 张热门{orientation}壁纸 (不限分辨率)...")
     resp = requests.get(url, headers=headers, params=params, timeout=30)
     
     if resp.status_code != 200:
@@ -101,17 +94,13 @@ def get_unsplash_wallpapers_by_orientation(orientation, count):
     image_list = []
     
     for data in data_list:
-        # 获取图片的基础 URL (使用 raw 尺寸，以方便动态修改参数)
-        base_url = data["urls"]["raw"]
-        
-        # 动态调整 URL 以获取指定 2K 分辨率的图片
-        # 拼接 w, h 和 fit=crop 参数确保图片尺寸精确到 2K
-        # 注意：base_url 通常已有参数，所以用 & 连接
-        dynamic_url = f"{base_url}&w={width}&h={height}&fit=crop"
+        # 直接使用 'full' 尺寸，它是 Unsplash 提供的最高质量且适合显示的图片
+        # 如果需要原始未经处理的 raw 文件，可以使用 data["urls"]["raw"]
+        image_url = data["urls"]["full"]
         
         image_list.append({
             "id": data["id"],
-            "url": dynamic_url, # 使用动态分辨率 URL
+            "url": image_url, 
             "photographer": data["user"]["name"],
             "photo_url": data["links"]["html"]
         })
@@ -144,7 +133,7 @@ def ensure_onedrive_folder(access_token, folder_path):
     """
     headers = {"Authorization": f"Bearer {access_token}"}
     
-    # 分割路径：例如 "Pictures/Unsplash/Landscape" -> ["Pictures", "Unsplash", "Landscape"]
+    # 分割路径
     path_parts = [p for p in folder_path.split("/") if p]
     current_path = ""
     
@@ -241,13 +230,12 @@ def upload_to_onedrive(access_token, image_data, image_info, content_type, targe
 if __name__ == "__main__":
     
     total_files = IMAGE_COUNT_PER_ORIENTATION * 2
-    print(f"⏰ {datetime.now(ZoneInfo('Asia/Shanghai'))} - 🚀 开始获取和上传共 {total_files} 张 2K 壁纸")
+    print(f"⏰ {datetime.now(ZoneInfo('Asia/Shanghai'))} - 🚀 开始获取和上传共 {total_files} 张壁纸")
     
     # 1. 获取认证 token
     token = get_access_token()
     
     # 2. 定义任务列表 
-    # (修正：使用正确的常量 IMAGE_COUNT_PER_ORIENTATION)
     tasks = [
         ("landscape", IMAGE_COUNT_PER_ORIENTATION, LANDSCAPE_FOLDER),
         ("portrait", IMAGE_COUNT_PER_ORIENTATION, PORTRAIT_FOLDER),
