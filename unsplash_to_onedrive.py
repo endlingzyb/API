@@ -44,33 +44,33 @@ def get_access_token():
 
 
 # ==============================================================================
-# Unsplash 数据获取函数
+# Unsplash 数据获取函数 (关键修改)
 # ==============================================================================
 
-# ========== 从 Unsplash 获取热门壁纸 (5张) ==========
+# ========== 从 Unsplash 获取随机壁纸 (5张) ==========
 def get_unsplash_wallpapers():
     """
-    从 Unsplash API 获取指定数量 (IMAGE_COUNT) 的热门横向壁纸。
-    返回一个包含图片信息的列表。
+    从 Unsplash API 获取指定数量 (IMAGE_COUNT) 的【随机】横向壁纸。
+    使用随机接口可以有效避免每天下载重复图片的问题。
     """
     unsplash_access_key = os.environ.get("UNSPLASH_ACCESS_KEY")
     if not unsplash_access_key:
         print("❌ 未设置 UNSPLASH_ACCESS_KEY")
         exit(1)
     
-    # 更改为 /photos 接口，用于获取多张图片
-    url = "https://api.unsplash.com/photos"
+    # [修改点 1] 更改为 /photos/random 接口
+    url = "https://api.unsplash.com/photos/random"
     headers = {"Authorization": f"Client-ID {unsplash_access_key}"}
     
-    # API 参数设置：
+    # [修改点 2] 参数调整
     params = {
-        "per_page": IMAGE_COUNT,  # 每次获取 5 张
-        "order_by": "popular",    # 按热门排序
-        "query": "wallpapers",     # 搜索关键词：壁纸
-        "orientation": "landscape" # 默认获取横向壁纸
+        "count": IMAGE_COUNT,      # 随机接口使用 count 指定数量
+        "query": "wallpaper",      # 依然限定为壁纸类
+        "orientation": "landscape" # 限定横屏
+        # 移除了 order_by，因为随机接口本身就是无序的
     }
     
-    print(f"📷 正在从 Unsplash 获取 {IMAGE_COUNT} 张热门壁纸...")
+    print(f"📷 正在从 Unsplash 随机抽取 {IMAGE_COUNT} 张壁纸...")
     resp = requests.get(url, headers=headers, params=params, timeout=30)
     
     if resp.status_code != 200:
@@ -125,9 +125,7 @@ def ensure_onedrive_folder(access_token, folder_path):
     
     # 逐级检查和创建文件夹
     for part in path_parts:
-        # parent_path 是当前要创建/检查的文件夹的父级路径
         parent_path = current_path
-        # current_path 是当前要创建/检查的完整路径
         current_path = f"{current_path}/{part}" if current_path else part
         
         # 1. 检查是否存在
@@ -137,20 +135,17 @@ def ensure_onedrive_folder(access_token, folder_path):
         resp = requests.get(check_url, headers=headers, timeout=30)
         
         if resp.status_code == 200:
-            # 文件夹已存在
             continue
         elif resp.status_code == 404:
             # 2. 不存在，执行创建
             print(f"📁 创建文件夹: {current_path}")
             
-            # 构建创建 API 的 URL
             if not parent_path:
                 create_url = "https://graph.microsoft.com/v1.0/me/drive/root/children"
             else:
                 encoded_parent = urllib.parse.quote(parent_path)
                 create_url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_parent}:/children"
             
-            # 创建请求体
             data = {
                 "name": part,
                 "folder": {},
@@ -160,7 +155,7 @@ def ensure_onedrive_folder(access_token, folder_path):
             create_resp = requests.post(create_url, headers=headers, json=data, timeout=30)
             
             if create_resp.status_code == 409:
-                print(f"ℹ️  文件夹刚刚被创建 (并发或竞态条件): {current_path}")
+                print(f"ℹ️  文件夹刚刚被创建: {current_path}")
             elif create_resp.status_code not in [200, 201]:
                 print(f"❌ 创建文件夹失败: {create_resp.status_code} - {create_resp.text}")
                 exit(1)
@@ -186,7 +181,7 @@ def upload_to_onedrive(access_token, image_data, image_info, content_type):
     beijing_time = datetime.now(ZoneInfo("Asia/Shanghai"))
     filename = f"{beijing_time.strftime('%Y%m%d_%H%M%S')}_{image_info['id']}{extension}"
     
-    # 目标路径 (恢复到原始路径)
+    # 目标路径
     target_folder = "Pictures/Unsplash"
     ensure_onedrive_folder(access_token, target_folder)
     
@@ -194,7 +189,7 @@ def upload_to_onedrive(access_token, image_data, image_info, content_type):
     full_path = f"{target_folder}/{filename}"
     encoded_full_path = urllib.parse.quote(full_path)
     
-    # 上传 URL
+    # 上传 URL (conflictBehavior=rename 即使极小概率重名也会自动重命名)
     upload_url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_full_path}:/content?@microsoft.graph.conflictBehavior=rename" 
     
     headers = {
@@ -219,12 +214,12 @@ def upload_to_onedrive(access_token, image_data, image_info, content_type):
 # ==============================================================================
 
 if __name__ == "__main__":
-    print(f"⏰ {datetime.now(ZoneInfo('Asia/Shanghai'))} - 🚀 开始获取和上传 {IMAGE_COUNT} 张壁纸")
+    print(f"⏰ {datetime.now(ZoneInfo('Asia/Shanghai'))} - 🚀 开始获取和上传 {IMAGE_COUNT} 张随机壁纸")
     
     # 1. 获取认证 token
     token = get_access_token()
     
-    # 2. 获取壁纸列表
+    # 2. 获取随机壁纸列表
     image_list = get_unsplash_wallpapers()
     
     # 3. 遍历列表，下载并上传每张图片
