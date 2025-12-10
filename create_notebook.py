@@ -3,11 +3,18 @@ import requests
 import html
 import time
 import random
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 
+# ================= 配置区域 =================
+# 默认坐标（北京），如果你想改，可以在 Github Secrets 里设置 LATITUDE 和 LONGITUDE
+DEFAULT_LAT = "39.9042"
+DEFAULT_LON = "116.4074"
 
-# ========== 获取 access_token ==========
+# ========== 工具函数：获取 access_token ==========
 def get_access_token():
     client_id = os.environ["CLIENT_ID"]
     client_secret = os.environ["CLIENT_SECRET"]
@@ -28,261 +35,231 @@ def get_access_token():
         print("❌ 获取 access_token 失败")
         print(resp.text)
         exit(1)
-
     return resp.json()["access_token"]
 
-
-# ========== 查询个人资料 ==========
-def get_my_profile(access_token):
-    headers = {"Authorization": f"Bearer {access_token}"}
-    url = "https://graph.microsoft.com/v1.0/me"
-
-    requests.get("https://graph.microsoft.com/v1.0/me/messages", headers=headers)
-    requests.get("https://graph.microsoft.com/v1.0/me/events?$select=subject,body,bodyPreview,organizer,attendees,start,end,location", headers=headers)
-    requests.get("https://graph.microsoft.com/v1.0/me/drive/root/children", headers=headers)
-    requests.get("https://graph.microsoft.com/v1.0/sites/root", headers=headers)
-    requests.get("https://graph.microsoft.com/v1.0/me/joinedTeams", headers=headers)
-    resp = requests.get(url, headers=headers)
-    if resp.status_code == 200:
-        profile = resp.json()
-        info = {
-            "姓名": profile.get("displayName"),
-            "邮箱": profile.get("mail") or profile.get("userPrincipalName"),
-            "职位": profile.get("jobTitle"),
-            "手机号": profile.get("mobilePhone"),
-            "办公电话": ", ".join(profile.get("businessPhones", [])),
-            "办公室": profile.get("officeLocation"),
-        }
-
-        print("👤 我的个人资料：")
-        for k, v in info.items():
-            print(f"{k}: {v}")
-
-        return info
-    else:
-        print("❌ 获取个人资料失败")
-        print(resp.status_code, resp.text)
-        return {}
-
-
-# ========== 获取或创建笔记本 ==========
-def get_or_create_notebook(access_token, notebook_name="MyNotes"):
-    headers = {"Authorization": f"Bearer {access_token}"}
+# ========== 数据获取：今日天气 (Open-Meteo 免费 API) ==========
+def get_weather():
+    lat = os.environ.get("LATITUDE", DEFAULT_LAT)
+    lon = os.environ.get("LONGITUDE", DEFAULT_LON)
     
-    # 获取所有笔记本
-    notebooks_url = "https://graph.microsoft.com/v1.0/me/onenote/notebooks"
-    resp = requests.get(notebooks_url, headers=headers)
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "daily": "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset",
+        "current_weather": "true",
+        "timezone": "auto"
+    }
     
-    if resp.status_code != 200:
-        print("❌ 获取笔记本失败")
-        print(resp.text)
-        exit(1)
+    try:
+        resp = requests.get(url, params=params, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            daily = data.get("daily", {})
+            current = data.get("current_weather", {})
+            
+            # WMO 天气代码映射
+            wmo_code = current.get("weathercode", 0)
+            weather_desc = "晴朗"
+            if wmo_code in [1, 2, 3]: weather_desc = "多云"
+            elif wmo_code in [45, 48]: weather_desc = "雾"
+            elif 51 <= wmo_code <= 67: weather_desc = "雨"
+            elif 71 <= wmo_code <= 77: weather_desc = "雪"
+            elif wmo_code >= 80: weather_desc = "阵雨/雷雨"
+
+            return {
+                "temp_now": current.get("temperature"),
+                "temp_max": daily.get("temperature_2m_max", ["-"])[0],
+                "temp_min": daily.get("temperature_2m_min", ["-"])[0],
+                "desc": weather_desc,
+                "wind": current.get("windspeed")
+            }
+    except Exception as e:
+        print(f"⚠️ 获取天气失败: {e}")
     
-    notebooks = resp.json().get("value", [])
+    return None
+
+# ========== 数据获取：每日一言 (Hitokoto) ==========
+def get_hitokoto():
+    try:
+        # 获取动画、文学、哲学类的句子
+        resp = requests.get("https://v1.hitokoto.cn/?c=d&c=i&c=k", timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            return {
+                "content": data.get("hitokoto"),
+                "from": data.get("from")
+            }
+    except Exception:
+        pass
+    return {"content": "今天也是充满希望的一天。", "from": "Unknown"}
+
+# ========== 核心逻辑：生成精美 HTML 内容 ==========
+def generate_page_content(image_url, weather_data, quote_data):
+    # 时间格式化
+    now = datetime.now(ZoneInfo("Asia/Shanghai"))
+    date_str = now.strftime("%Y年%m月%d日")
+    week_days = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    weekday_str = week_days[now.weekday()]
     
-    # 查找现有笔记本
-    for notebook in notebooks:
-        if notebook.get("displayName") == notebook_name:
-            print(f"✅ 找到笔记本: {notebook_name}")
-            return notebook["id"]
+    # 天气 HTML
+    weather_html = "暂无天气数据"
+    if weather_data:
+        weather_html = f"""
+        <div style="font-size: 24px; font-weight: bold; color: #333;">{weather_data['temp_now']}°C</div>
+        <div style="color: #666; margin-top: 5px;">
+            {weather_data['desc']} | {weather_data['temp_min']}° ~ {weather_data['temp_max']}°
+        </div>
+        """
+
+    # 图片 HTML
+    img_html = ""
+    if image_url:
+        img_html = f"""
+        <div style="margin: 20px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+            <img src="{html.escape(image_url)}" alt="Daily Wallpaper" style="width: 100%; display: block;" />
+        </div>
+        """
+
+    # 组合整体 HTML (使用 Table 布局以兼容 OneNote)
+    page_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>{date_str} {weekday_str} | 每日晨报</title>
+        <meta name="created" content="{now.strftime('%Y-%m-%dT%H:%M:%S%z')}" />
+    </head>
+    <body style="font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; color: #333; line-height: 1.6;">
+        
+        <h1 style="color: #2c3e50; border-bottom: 2px solid #eaeaea; padding-bottom: 10px;">
+            📅 {date_str} <span style="font-size: 0.6em; color: #888; font-weight: normal;">{weekday_str}</span>
+        </h1>
+
+        <table border="0" width="100%" cellspacing="0" cellpadding="10" style="background-color: #f9f9f9; border-radius: 8px; margin-top: 15px;">
+            <tr>
+                <td width="40%" valign="top" style="border-right: 1px solid #eee;">
+                    <div style="font-size: 14px; color: #888; margin-bottom: 5px;">今日天气</div>
+                    {weather_html}
+                </td>
+                <td width="60%" valign="top">
+                    <div style="font-size: 14px; color: #888; margin-bottom: 5px;">每日一言</div>
+                    <div style="font-style: italic; color: #444; font-weight: 500;">“{html.escape(quote_data['content'])}”</div>
+                    <div style="text-align: right; color: #999; font-size: 12px; margin-top: 8px;">—— {html.escape(quote_data['from'])}</div>
+                </td>
+            </tr>
+        </table>
+
+        <h3 style="margin-top: 25px; color: #2980b9;">🎯 今日重点 (Top Priorities)</h3>
+        <p data-tag="to-do">重要事项 1</p>
+        <p data-tag="to-do">重要事项 2</p>
+        <p data-tag="to-do">阅读 / 学习</p>
+
+        {img_html}
+
+        <h3 style="margin-top: 20px; color: #7f8c8d;">📝 随记 (Notes)</h3>
+        <p style="color: #aaa;">点击此处开始输入...</p>
+
+    </body>
+    </html>
+    """
+    return page_html, now
+
+# ========== OneNote API 操作 ==========
+def create_onenote_page(access_token, html_content, created_time):
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "text/html"
+    }
     
-    # 创建新笔记本
-    print(f"📓 创建新笔记本: {notebook_name}")
-    create_resp = requests.post(
-        notebooks_url,
+    # 查找或创建分区
+    notebook_name = "MyNotes"
+    section_name = created_time.strftime("%Y年%m月")
+    
+    # 简化逻辑：这里假设你之前的 helper 函数逻辑没问题
+    # 为了代码整洁，直接内联简单的获取逻辑，如果项目很大建议保留 helper
+    
+    # 1. 获取所有笔记本找到 ID
+    nb_resp = requests.get("https://graph.microsoft.com/v1.0/me/onenote/notebooks", headers=headers)
+    nb_id = next((nb['id'] for nb in nb_resp.json().get('value', []) if nb['displayName'] == notebook_name), None)
+    
+    if not nb_id:
+        # 创建笔记本
+        print(f"创建笔记本: {notebook_name}")
+        resp = requests.post("https://graph.microsoft.com/v1.0/me/onenote/notebooks", headers=headers, json={"displayName": notebook_name})
+        nb_id = resp.json()['id']
+
+    # 2. 获取/创建分区
+    sec_resp = requests.get(f"https://graph.microsoft.com/v1.0/me/onenote/notebooks/{nb_id}/sections", headers=headers)
+    sec_id = next((s['id'] for s in sec_resp.json().get('value', []) if s['displayName'] == section_name), None)
+    
+    if not sec_id:
+        # 创建分区
+        print(f"创建分区: {section_name}")
+        resp = requests.post(f"https://graph.microsoft.com/v1.0/me/onenote/notebooks/{nb_id}/sections", headers=headers, json={"displayName": section_name})
+        sec_id = resp.json()['id']
+
+    # 3. 创建页面
+    print("正在写入 OneNote 页面...")
+    page_resp = requests.post(
+        f"https://graph.microsoft.com/v1.0/me/onenote/sections/{sec_id}/pages",
         headers=headers,
-        json={"displayName": notebook_name}
+        data=html_content.encode('utf-8')
     )
     
-    if create_resp.status_code == 201:
-        notebook_id = create_resp.json()["id"]
-        print(f"✅ 笔记本创建成功: {notebook_id}")
-        return notebook_id
+    if page_resp.status_code == 201:
+        print(f"✅ 成功创建页面：{page_resp.json()['links']['oneNoteWebUrl']['href']}")
     else:
-        print("❌ 创建笔记本失败")
-        print(create_resp.text)
-        exit(1)
+        print("❌ 创建页面失败", page_resp.text)
 
-
-# ========== 获取或创建分区 ==========
-def get_or_create_section(access_token, notebook_id, section_name):
+# ========== OneDrive 图片获取 (保留原有逻辑) ==========
+def get_today_image(access_token):
     headers = {"Authorization": f"Bearer {access_token}"}
-    
-    # 获取笔记本的所有分区
-    sections_url = f"https://graph.microsoft.com/v1.0/me/onenote/notebooks/{notebook_id}/sections"
-    resp = requests.get(sections_url, headers=headers)
-    
-    if resp.status_code != 200:
-        print("❌ 获取分区失败")
-        print(resp.text)
-        exit(1)
-    
-    sections = resp.json().get("value", [])
-    
-    # 查找现有分区
-    for section in sections:
-        if section.get("displayName") == section_name:
-            print(f"✅ 找到分区: {section_name}")
-            return section["id"]
-    
-    # 创建新分区
-    print(f"📑 创建新分区: {section_name}")
-    create_resp = requests.post(
-        sections_url,
-        headers=headers,
-        json={"displayName": section_name}
-    )
-    
-    if create_resp.status_code == 201:
-        section_id = create_resp.json()["id"]
-        print(f"✅ 分区创建成功: {section_id}")
-        return section_id
-    else:
-        print("❌ 创建分区失败")
-        print(create_resp.text)
-        exit(1)
-
-
-# ========== 获取 OneDrive 图片 ==========
-def get_random_image_from_onedrive(access_token):
-    headers = {"Authorization": f"Bearer {access_token}"}
-    
-    # 获取 Pictures/Unsplash 目录下的文件
-    folder_path = "Pictures/Unsplash"
-    encoded_path = requests.utils.quote(folder_path)
+    folder = "Pictures/Unsplash"
+    encoded_path = requests.utils.quote(folder)
     url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_path}:/children"
     
     resp = requests.get(url, headers=headers)
-    
-    if resp.status_code != 200:
-        print(f"❌ 获取 OneDrive 图片失败: {resp.status_code}")
-        print(resp.text)
-        return None
+    if resp.status_code != 200: return None
     
     files = resp.json().get("value", [])
+    # 筛选图片
+    images = [f for f in files if f.get("file") and f["name"].lower().endswith(('.jpg', '.png'))]
+    if not images: return None
     
-    # 过滤出图片文件
-    image_files = [f for f in files if f.get("file") and any(f["name"].lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp'])]
+    images.sort(key=lambda x: x["name"], reverse=True)
     
-    if not image_files:
-        print("❌ OneDrive 中没有找到图片")
-        return None
+    # 找当天的
+    beijing_now = datetime.now(ZoneInfo("Asia/Shanghai"))
+    today_prefix = beijing_now.strftime("%Y%m%d")
     
-    # 按文件名排序（假设文件名以日期开头，如 YYYYMMDD_HHMMSS_xxx.jpg）
-    image_files.sort(key=lambda x: x["name"], reverse=True)
+    selected = next((img for img in images if img["name"].startswith(today_prefix)), images[0] if images else None)
     
-    # 尝试获取当天的图片（文件名需以 YYYYMMDD 开头）
-    beijing_time = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai"))
-    today_str = beijing_time.strftime("%Y%m%d")
-    
-    # 尝试找到当天的图片
-    today_image = None
-    for img in image_files:
-        if img["name"].startswith(today_str):
-            today_image = img
-            break
-    
-    # 如果找不到当天的图片，使用最新的图片
-    selected_image = today_image if today_image else image_files[0]
-    
-    print(f"✅ 选择图片: {selected_image['name']}")
-    
-    # 获取图片的下载链接
-    return selected_image.get("@microsoft.graph.downloadUrl")
+    if selected:
+        print(f"✅ 选中图片: {selected['name']}")
+        return selected.get("@microsoft.graph.downloadUrl")
+    return None
 
-
-# ========== 创建 OneNote 页面 ==========
-def create_page(access_token, profile_info):
-    def generate_joke():
-        try:
-            headers = {"Accept": "application/json"}
-            resp = requests.get("https://icanhazdadjoke.com/", headers=headers)
-            if resp.status_code == 200:
-                return html.escape(resp.json()["joke"])
-            else:
-                return "加载笑话失败 🥲"
-        except Exception:
-            return "获取笑话异常 🥲"
-
-    # 获取北京时间
-    current_time = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai"))
-    
-    # 页面标题格式：DD日HH:MM
-    title = current_time.strftime("%d日%H:%M")
-    
-    # 月份分区名称：YYYY年MM月
-    section_name = current_time.strftime("%Y年%m月")
-    
-    joke = generate_joke()
-    
-    # 获取或创建笔记本和分区
-    notebook_id = get_or_create_notebook(access_token, "MyNotes")
-    section_id = get_or_create_section(access_token, notebook_id, section_name)
-    
-    # 获取 OneDrive 图片
-    image_url = get_random_image_from_onedrive(access_token)
-    
-    # 图片 HTML
-    image_html = ""
-    if image_url:
-        image_html = f'<img src="{html.escape(image_url)}" alt="每日图片" />'
-    else:
-        image_html = '<p>未找到图片</p>'
-    
-    # 🔹 个人资料拼接成表格
-    profile_html = ""
-    if profile_info:
-        profile_html += "<h2>个人资料</h2><table border='1' cellspacing='0' cellpadding='5'>"
-        profile_html += "<tr><th>字段</th><th>内容</th></tr>"
-        for k, v in profile_info.items():
-            if v:
-                profile_html += f"<tr><td>{html.escape(k)}</td><td>{html.escape(str(v))}</td></tr>"
-        profile_html += "</table>"
-
-    page_content = f"""<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <title>{title}</title>
-    <meta name="created" content="{current_time.strftime('%Y-%m-%dT%H:%M:%S%z')}" />
-  </head>
-  <body>
-    <h1>{title}</h1>
-    <p>{joke}</p>
-    {image_html}
-    {profile_html}
-  </body>
-</html>"""
-
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/xhtml+xml"
-    }
-
-    # 创建页面到指定分区
-    response = requests.post(
-        f"https://graph.microsoft.com/v1.0/me/onenote/sections/{section_id}/pages",
-        headers=headers,
-        data=page_content
-    )
-
-    if response.status_code == 201:
-        print("✅ 成功创建 OneNote 页面：")
-        print(response.json()["links"]["oneNoteWebUrl"]["href"])
-    else:
-        print("❌ 页面创建失败")
-        print(response.status_code)
-        print(response.text)
-
-
-
-
-# ========== 主函数 ==========
+# ========== 主程序 ==========
 if __name__ == "__main__":
-    # 🔹 随机延迟 5-30 秒
-    delay = random.randint(5, 30)
-    print(f"⏳ 随机延迟 {delay} 秒后开始执行...")
-    time.sleep(delay)
+    print("🚀 启动每日晨报生成器...")
     
-    token = get_access_token()
-    profile_info = get_my_profile(token)   # 获取个人资料
-    create_page(token, profile_info)       # 创建页面时附带资料表格
+    # 随机延迟，模拟人类操作习惯
+    time.sleep(random.randint(5, 15))
+    
+    try:
+        token = get_access_token()
+        
+        # 1. 并行准备数据
+        weather = get_weather()
+        quote = get_hitokoto()
+        img_url = get_today_image(token)
+        
+        # 2. 生成 HTML 内容
+        html_content, created_time = generate_page_content(img_url, weather, quote)
+        
+        # 3. 推送到 OneNote
+        create_onenote_page(token, html_content, created_time)
+        
+    except Exception as e:
+        print(f"❌ 脚本执行出错: {e}")
+        exit(1)

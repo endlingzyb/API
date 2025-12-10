@@ -1,0 +1,3 @@
+requests
+# 用于处理时区，防止某些环境报错
+tzdata
