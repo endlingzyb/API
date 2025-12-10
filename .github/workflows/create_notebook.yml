@@ -15,15 +15,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 🔴 修改点 1：如果是本地 act 运行，手动安装系统级 Python 依赖
+      - name: Install System Dependencies (Local ARM64)
+        if: ${{ env.ACT }}
+        run: |
+          apt-get update
+          apt-get install -y python3-pip python3-venv
+
+      # 🔴 修改点 2：如果是本地 act 运行，跳过 setup-python（因为 ARM64 兼容性差）
       - name: Set up Python
+        if: ${{ !env.ACT }}
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-          cache: 'pip' # 开启缓存，加速安装
+          cache: 'pip'
 
+      # 🟢 修改点 3：安装 Python 库 (为了兼容 Debian 系统，增加 --break-system-packages)
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          # 兼容处理：如果在 act 容器里，可能需要加参数允许系统级安装
+          if [ "$ACT" = "true" ]; then
+            pip install -r requirements.txt --break-system-packages
+          else
+            pip install -r requirements.txt
+          fi
 
       - name: Run Python script
         run: python create_notebook.py
@@ -32,6 +47,5 @@ jobs:
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
           TENANT_ID: ${{ secrets.TENANT_ID }}
           GRAPH_REFRESH_TOKEN: ${{ secrets.GRAPH_REFRESH_TOKEN }}
-          # 下面这两个变量可选，如果不填代码里会默认使用北京坐标
           LATITUDE: ${{ secrets.LATITUDE }}
           LONGITUDE: ${{ secrets.LONGITUDE }}
