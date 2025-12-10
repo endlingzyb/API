@@ -15,13 +15,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 🔴 新增：如果是本地 act 运行，手动安装系统级 Python 依赖
+      - name: Install System Dependencies (Local ARM64)
+        if: ${{ env.ACT }}
+        run: |
+          apt-get update
+          apt-get install -y python3-pip python3-venv
+
+      # 🔴 修改：如果是本地 act 运行，跳过 setup-python（避免 ARM64 兼容性问题）
       - name: Set up Python
+        if: ${{ !env.ACT }}
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+          cache: 'pip'
 
+      # 🟢 修改：安装依赖时的兼容性处理
       - name: Install dependencies
-        run: pip install requests
+        run: |
+          # 兼容处理：如果在 act 容器里 (Debian)，需要加参数允许系统级安装
+          if [ "$ACT" = "true" ]; then
+            pip install -r requirements.txt --break-system-packages
+          else
+            pip install -r requirements.txt
+          fi
 
       - name: Run Unsplash to OneDrive script
         run: |
