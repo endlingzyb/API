@@ -6,13 +6,25 @@ import requests
 import sys
 import time
 import threading
+import os
+from dotenv import load_dotenv
 
 # ================= 配置区域 =================
-# 脚本运行时会要求输入，也可以直接填在这里
-CLIENT_ID = ""
-CLIENT_SECRET = ""
-TENANT_ID = ""  # 如果不知道，可以填 "common"
-REDIRECT_URI = "http://localhost:5000"
+# 1. 尝试加载 my.secrets 文件
+if os.path.exists('my.secrets'):
+    load_dotenv('my.secrets')
+    print("✅ 已加载 my.secrets 文件")
+else:
+    print("⚠️ 未找到 my.secrets 文件，将使用手动输入或系统环境变量")
+
+# 2. 从环境变量(secrets)中获取，如果没有则留空，稍后会要求手动输入
+CLIENT_ID = os.getenv("CLIENT_ID", "")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET", "")
+TENANT_ID = os.getenv("TENANT_ID", "common")  # 默认为 common
+
+# 3. 端口必须与 Azure 注册的回调地址一致
+PORT = 8000
+REDIRECT_URI = f"http://localhost:{PORT}" 
 # ===========================================
 
 auth_code = None
@@ -36,6 +48,7 @@ class OAuthHandler(http.server.SimpleHTTPRequestHandler):
                 <h1 style="color: green;">授权成功！</h1>
                 <p>已获取 Authorization Code。</p>
                 <p>你可以关闭此窗口，回到终端查看 Refresh Token。</p>
+                <script>window.close()</script>
             </body>
             </html>
             """
@@ -50,7 +63,9 @@ class OAuthHandler(http.server.SimpleHTTPRequestHandler):
 
 def start_server():
     # 启动本地服务器监听回调
-    with socketserver.TCPServer(("localhost", 8000), OAuthHandler) as httpd:
+    # 允许地址重用，防止报错 "Address already in use"
+    socketserver.TCPServer.allow_reuse_address = True
+    with socketserver.TCPServer(("localhost", PORT), OAuthHandler) as httpd:
         while auth_code is None:
             httpd.handle_request()
 
@@ -64,7 +79,7 @@ def get_refresh_token(client_id, client_secret, tenant_id):
         "response_type": "code",
         "redirect_uri": REDIRECT_URI,
         "response_mode": "query",
-        "scope": "offline_access User.Read",
+        "scope": "offline_access User.Read Files.ReadWrite Notes.ReadWrite", # 自动加上了你需要的权限
         "state": "12345"
     }
     auth_url = f"{base_url}?{urllib.parse.urlencode(params)}"
@@ -77,10 +92,10 @@ def get_refresh_token(client_id, client_secret, tenant_id):
     server_thread.start()
     
     time.sleep(1)
-    webbrowser.open(auth_code if False else auth_url) # 简单的打开链接
+    webbrowser.open(auth_url)
 
     # 3. 等待用户登录并获取 Code
-    print("⏳ 等待回调中 (请在浏览器完成登录)...")
+    print(f"⏳ 正在监听 http://localhost:{PORT} 等待回调...")
     while auth_code is None:
         time.sleep(1)
     
@@ -90,7 +105,7 @@ def get_refresh_token(client_id, client_secret, tenant_id):
     token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
     data = {
         "client_id": client_id,
-        "scope": "offline_access User.Read",
+        "scope": "offline_access User.Read Files.ReadWrite Notes.ReadWrite",
         "code": auth_code,
         "redirect_uri": REDIRECT_URI,
         "grant_type": "authorization_code",
@@ -107,7 +122,7 @@ def get_refresh_token(client_id, client_secret, tenant_id):
         print("="*60)
         print(f"\n{json_resp['refresh_token']}\n")
         print("="*60)
-        print("注意：Token 通常很长，请确保复制完整。")
+        print("💡 提示：请将此 Token 填入 my.secrets 文件和 GitHub Secrets 中。")
     else:
         print("\n❌ 获取失败，错误信息：")
         print(json_resp)
@@ -115,10 +130,14 @@ def get_refresh_token(client_id, client_secret, tenant_id):
 if __name__ == "__main__":
     print("--- Microsoft Graph API Refresh Token 获取助手 ---")
     
-    # 如果代码里没填，就让用户输入
+    # 优先使用 secrets 里的值，如果没有则提示输入
     c_id = CLIENT_ID if CLIENT_ID else input("请输入 Client ID (应用程序ID): ").strip()
     c_secret = CLIENT_SECRET if CLIENT_SECRET else input("请输入 Client Secret (客户端密码): ").strip()
-    t_id = TENANT_ID if TENANT_ID else input("请输入 Tenant ID (租户ID): ").strip()
+    t_id = TENANT_ID if TENANT_ID else input("请输入 Tenant ID (直接回车默认为 common): ").strip() or "common"
     
+    if not c_id or not c_secret:
+        print("❌ 错误：必须提供 Client ID 和 Client Secret")
+        sys.exit(1)
+
     get_refresh_token(c_id, c_secret, t_id)
     input("\n按回车键退出...")
