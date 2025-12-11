@@ -1,28 +1,26 @@
-name: Unsplash to OneDrive
+name: Create SharePoint Page
 
 on:
   schedule:
-    # 北京时间每天早晨 6:06 运行（UTC 22:06）
-    - cron: '6 22 * * *'
-  workflow_dispatch:  # 允许手动触发
+    # 周一、三、五 北京时间 6:37 (UTC 02:37)
+    - cron: '37 22 * * *'
+  workflow_dispatch:
 
 jobs:
-  download_and_upload:
+  create_sharepoint:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 🔴 新增：如果是本地 act 运行，手动安装系统级 Python 依赖
+      # 🔴 修改点 1：如果是本地 act 运行，手动安装系统级 Python 依赖
       - name: Install System Dependencies (Local ARM64)
         if: ${{ env.ACT }}
         run: |
           apt-get update
           apt-get install -y python3-pip python3-venv
 
-      # 🔴 修改：如果是本地 act 运行，跳过 setup-python（避免 ARM64 兼容性问题）
+      # 🔴 修改点 2：如果是本地 act 运行，跳过 setup-python（因为 ARM64 兼容性差）
       - name: Set up Python
         if: ${{ !env.ACT }}
         uses: actions/setup-python@v4
@@ -30,22 +28,23 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      # 🟢 修改：安装依赖时的兼容性处理
+      # 🟢 修改点 3：安装 Python 库 (为了兼容 Debian 系统，增加 --break-system-packages)
       - name: Install dependencies
         run: |
-          # 兼容处理：如果在 act 容器里 (Debian)，需要加参数允许系统级安装
+          # 兼容处理：如果在 act 容器里，可能需要加参数允许系统级安装
           if [ "$ACT" = "true" ]; then
             pip install -r requirements.txt --break-system-packages
           else
             pip install -r requirements.txt
           fi
 
-      - name: Run Unsplash to OneDrive script
-        run: |
-          python unsplash_to_onedrive.py
+      - name: Run Python script
+        run: python create_sharepoint.py
         env:
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
           TENANT_ID: ${{ secrets.TENANT_ID }}
           GRAPH_REFRESH_TOKEN: ${{ secrets.GRAPH_REFRESH_TOKEN }}
-          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          SHAREPOINT_SITE_NAME: ${{ secrets.SHAREPOINT_SITE_NAME }}
+          LATITUDE: ${{ secrets.LATITUDE }}
+          LONGITUDE: ${{ secrets.LONGITUDE }}

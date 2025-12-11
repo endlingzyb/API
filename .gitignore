@@ -21,7 +21,7 @@ wheels/
 *.egg
 
 # Virtual Environment
-venv/
+.venv/
 env/
 ENV/
 
@@ -35,3 +35,13 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+*.secrets
+.actrc
+my.secrets
+.actrc
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/

@@ -1,7 +1,10 @@
 import os
 import requests
+import urllib.parse
 from datetime import datetime
-import urllib.parse  # 用于 URL 编码
+import time
+
+# 尝试导入时区库，兼容不同 Python 版本
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
@@ -20,6 +23,13 @@ def get_access_token():
     使用存储在环境变量中的 refresh_token 交换新的 access_token，
     用于访问 Microsoft Graph API (OneDrive)。
     """
+    # 调试：检查核心变量是否存在
+    if not os.environ.get("CLIENT_ID"):
+        print("❌ [致命错误] 环境变量 CLIENT_ID 未找到！")
+        print("   请检查：1. my.secrets 文件是否包含 CLIENT_ID")
+        print("           2. yaml 文件的 env 部分是否正确映射")
+        exit(1)
+
     client_id = os.environ["CLIENT_ID"]
     client_secret = os.environ["CLIENT_SECRET"]
     tenant_id = os.environ["TENANT_ID"]
@@ -34,64 +44,73 @@ def get_access_token():
         "scope": "https://graph.microsoft.com/.default offline_access"
     }
 
-    resp = requests.post(token_url, data=data, timeout=30)
-    if resp.status_code != 200:
-        print("❌ 获取 access_token 失败")
-        print(resp.text)
+    print("🔄 正在使用 Refresh Token 换取 Access Token...")
+    try:
+        resp = requests.post(token_url, data=data, timeout=30)
+        
+        if resp.status_code != 200:
+            print(f"❌ 获取 access_token 失败 (状态码: {resp.status_code})")
+            print(f"⚠️ 错误详情: {resp.text}")
+            exit(1)
+
+        return resp.json()["access_token"]
+        
+    except Exception as e:
+        print(f"❌ 请求 Microsoft 接口发生异常: {e}")
         exit(1)
 
-    return resp.json()["access_token"]
-
 
 # ==============================================================================
-# Unsplash 数据获取函数 (关键修改)
+# Unsplash 数据获取函数
 # ==============================================================================
 
-# ========== 从 Unsplash 获取随机壁纸 (5张) ==========
+# ========== 从 Unsplash 获取随机壁纸 ==========
 def get_unsplash_wallpapers():
     """
     从 Unsplash API 获取指定数量 (IMAGE_COUNT) 的【随机】横向壁纸。
-    使用随机接口可以有效避免每天下载重复图片的问题。
     """
     unsplash_access_key = os.environ.get("UNSPLASH_ACCESS_KEY")
+    
+    # 调试：检查 Unsplash Key
     if not unsplash_access_key:
-        print("❌ 未设置 UNSPLASH_ACCESS_KEY")
+        print("❌ [致命错误] 环境变量 UNSPLASH_ACCESS_KEY 未找到！")
+        print("   请检查 my.secrets 和 yaml 配置。")
         exit(1)
     
-    # [修改点 1] 更改为 /photos/random 接口
     url = "https://api.unsplash.com/photos/random"
     headers = {"Authorization": f"Client-ID {unsplash_access_key}"}
     
-    # [修改点 2] 参数调整
     params = {
-        "count": IMAGE_COUNT,      # 随机接口使用 count 指定数量
-        "query": "wallpaper",      # 依然限定为壁纸类
-        "orientation": "landscape" # 限定横屏
-        # 移除了 order_by，因为随机接口本身就是无序的
+        "count": IMAGE_COUNT,       # 随机接口使用 count 指定数量
+        "query": "wallpaper",       # 依然限定为壁纸类
+        "orientation": "landscape"  # 限定横屏
     }
     
     print(f"📷 正在从 Unsplash 随机抽取 {IMAGE_COUNT} 张壁纸...")
-    resp = requests.get(url, headers=headers, params=params, timeout=30)
-    
-    if resp.status_code != 200:
-        print(f"❌ 获取 Unsplash 图片失败: {resp.status_code}")
-        print(resp.text)
-        exit(1)
-    
-    data_list = resp.json()
-    
-    # 解析并返回一个包含多个图片信息的列表
-    image_list = []
-    for data in data_list:
-        image_list.append({
-            "id": data["id"],
-            # 使用 full 尺寸的 url，适合高分辨率壁纸
-            "url": data["urls"]["full"], 
-            "photographer": data["user"]["name"],
-            "photo_url": data["links"]["html"]
-        })
+    try:
+        resp = requests.get(url, headers=headers, params=params, timeout=30)
         
-    return image_list
+        if resp.status_code != 200:
+            print(f"❌ 获取 Unsplash 图片失败 (状态码: {resp.status_code})")
+            print(f"⚠️ 错误详情: {resp.text}")
+            exit(1)
+        
+        data_list = resp.json()
+        
+        image_list = []
+        for data in data_list:
+            image_list.append({
+                "id": data["id"],
+                "url": data["urls"]["full"], 
+                "photographer": data["user"]["name"],
+                "photo_url": data["links"]["html"]
+            })
+            
+        return image_list
+        
+    except Exception as e:
+        print(f"❌ 请求 Unsplash 接口发生异常: {e}")
+        exit(1)
 
 
 # ========== 下载图片 ==========
@@ -113,13 +132,9 @@ def download_image(image_url):
 
 # ========== 确保 OneDrive 目录存在 ==========
 def ensure_onedrive_folder(access_token, folder_path):
-    """
-    确保 OneDrive 中的文件夹路径存在。如果路径中任一级文件夹不存在，则按顺序创建。
-    注意：使用 URL 编码处理路径名中的特殊字符。
-    """
     headers = {"Authorization": f"Bearer {access_token}"}
     
-    # 分割路径：例如 "Pictures/Unsplash" -> ["Pictures", "Unsplash"]
+    # 分割路径
     path_parts = [p for p in folder_path.split("/") if p]
     current_path = ""
     
@@ -128,7 +143,6 @@ def ensure_onedrive_folder(access_token, folder_path):
         parent_path = current_path
         current_path = f"{current_path}/{part}" if current_path else part
         
-        # 1. 检查是否存在
         encoded_path = urllib.parse.quote(current_path)
         check_url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_path}"
         
@@ -137,7 +151,6 @@ def ensure_onedrive_folder(access_token, folder_path):
         if resp.status_code == 200:
             continue
         elif resp.status_code == 404:
-            # 2. 不存在，执行创建
             print(f"📁 创建文件夹: {current_path}")
             
             if not parent_path:
@@ -159,8 +172,6 @@ def ensure_onedrive_folder(access_token, folder_path):
             elif create_resp.status_code not in [200, 201]:
                 print(f"❌ 创建文件夹失败: {create_resp.status_code} - {create_resp.text}")
                 exit(1)
-            else:
-                print(f"✅ 文件夹创建成功")
         else:
             print(f"❌ 检查文件夹异常: {resp.status_code} - {resp.text}")
             exit(1)
@@ -168,9 +179,6 @@ def ensure_onedrive_folder(access_token, folder_path):
 
 # ========== 上传图片到 OneDrive ==========
 def upload_to_onedrive(access_token, image_data, image_info, content_type):
-    """
-    将图片二进制数据上传到 OneDrive 的指定文件夹 (Pictures/Unsplash)。
-    """
     # 扩展名判断
     extension = '.jpg'
     if 'png' in content_type.lower(): extension = '.png'
@@ -189,7 +197,7 @@ def upload_to_onedrive(access_token, image_data, image_info, content_type):
     full_path = f"{target_folder}/{filename}"
     encoded_full_path = urllib.parse.quote(full_path)
     
-    # 上传 URL (conflictBehavior=rename 即使极小概率重名也会自动重命名)
+    # 上传 URL
     upload_url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_full_path}:/content?@microsoft.graph.conflictBehavior=rename" 
     
     headers = {
